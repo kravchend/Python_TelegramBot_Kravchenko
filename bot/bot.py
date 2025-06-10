@@ -9,7 +9,7 @@ django.setup()
 from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 
-from bot.handlers import register_handlers  # поправить импорт
+from bot.handlers import register_handlers
 
 load_dotenv()
 API_TOKEN = os.getenv("BOT_TOKEN")

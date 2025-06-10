@@ -1,137 +1,276 @@
-from asgiref.sync import sync_to_async
-from calendarapp.models import Note
-
-from aiogram import types, Dispatcher, F
+from aiogram import Dispatcher, F, Router, types
 from aiogram.filters import Command
+from bot.calendar_instance import calendar
+from datetime import datetime
+
+router = Router()
 
 
 def main_keyboard():
     keyboard = [
-        [types.KeyboardButton(text="Создать заметку")],
-        [types.KeyboardButton(text="Показать мои заметки")],
-        [types.KeyboardButton(text="Показать отсортированные заметки")],
+        [
+            types.KeyboardButton(text="📆 Календарь: создать событие"),
+            types.KeyboardButton(text="📅 Календарь: список событий"),
+        ],
+        [
+            types.KeyboardButton(text="📆 Календарь: изменить событие"),
+            types.KeyboardButton(text="📆 Календарь: удалить событие"),
+        ],
     ]
     return types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 
-@sync_to_async
-def db_add_note(user_id, text):
-    Note.objects.create(user_id=user_id, text=text)
-
-
-@sync_to_async
-def db_get_notes(user_id):
-    return list(Note.objects.filter(user_id=user_id).order_by("created_at"))
-
-
-@sync_to_async
-def db_get_sorted_notes(user_id):
-    return list(Note.objects.filter(user_id=user_id).order_by("text"))
-
-
-@sync_to_async
-def db_delete_note(user_id, note_id):
-    Note.objects.filter(user_id=user_id, id=note_id).delete()
-
-
-@sync_to_async
-def db_update_note(user_id, note_id, new_text):
-    Note.objects.filter(user_id=user_id, id=note_id).update(text=new_text)
+calendar_creation_state = {}
 
 
 async def send_welcome(message: types.Message):
     full_name = message.from_user.full_name
     await message.answer(
-        f"Привет, {full_name}! Я твой бот для заметок.",
+        f"Привет, {full_name}! Я бот-календарь.",
         reply_markup=main_keyboard()
     )
 
 
-async def button_create_note(message: types.Message):
-    await message.answer("Введите текст новой заметки:", reply_markup=types.ReplyKeyboardRemove())
-
-
-async def save_new_note(message: types.Message):
+async def button_create_calendar_event(message: types.Message):
     user_id = message.from_user.id
-    note_text = message.text.strip()
-    if not note_text:
-        await message.answer("Заметка не может быть пустой. Попробуйте еще раз.")
-        return
-    await db_add_note(user_id, note_text)
-    await message.answer("Заметка сохранена!", reply_markup=main_keyboard())
-
-
-async def button_list_notes(message: types.Message):
-    user_id = message.from_user.id
-    notes = await db_get_notes(user_id)
-    if not notes:
-        await message.answer("У вас пока нет заметок.", reply_markup=main_keyboard())
-        return
-    notes_str = '\n'.join([f"{idx + 1}. {note.text}" for idx, note in enumerate(notes)])
-    await message.answer(f"Ваши заметки:\n{notes_str}", reply_markup=notes_inline_keyboard(notes))
-
-
-def notes_inline_keyboard(notes):
-    buttons = [
-        [
-            types.InlineKeyboardButton(text=f"✏️ {idx + 1}", callback_data=f"edit_{note.id}"),
-            types.InlineKeyboardButton(text=f"🗑 {idx + 1}", callback_data=f"del_{note.id}")
-        ]
-        for idx, note in enumerate(notes)
-    ]
-    return types.InlineKeyboardMarkup(inline_keyboard=buttons)
-
-
-async def button_list_sorted_notes(message: types.Message):
-    user_id = message.from_user.id
-    notes = await db_get_sorted_notes(user_id)
-    if not notes:
-        await message.answer("У вас пока нет заметок.", reply_markup=main_keyboard())
-        return
-    notes_str = '\n'.join([f"{idx + 1}. {note.text}" for idx, note in enumerate(notes)])
-    await message.answer(f"Ваши заметки (отсортированы):\n{notes_str}", reply_markup=notes_inline_keyboard(notes))
-
-
-async def delete_callback_handler(callback: types.CallbackQuery):
-    note_id = int(callback.data.split("_")[1])
-    user_id = callback.from_user.id
-    await db_delete_note(user_id, note_id)
-    await callback.message.edit_text('Заметка удалена.')
-    await callback.answer()
-
-
-edit_states = {}
-
-
-async def edit_callback_handler(callback: types.CallbackQuery):
-    note_id = int(callback.data.split("_")[1])
-    user_id = callback.from_user.id
-    edit_states[user_id] = note_id
-    await callback.message.answer(
-        f'Введите новый текст для выбранной заметки:',
+    calendar_creation_state[user_id] = {"step": "name"}
+    await message.answer(
+        "Введите название события:",
         reply_markup=types.ReplyKeyboardRemove()
     )
-    await callback.answer()
 
 
-async def save_edited_note(message: types.Message):
+async def process_calendar_creation(message: types.Message):
     user_id = message.from_user.id
-    if user_id in edit_states:
-        note_id = edit_states[user_id]
-        new_text = message.text.strip()
-        await db_update_note(user_id, note_id, new_text)
-        await message.answer("Заметка обновлена.", reply_markup=main_keyboard())
-        del edit_states[user_id]
-    else:
-        await message.answer("Нет редактируемой заметки.", reply_markup=main_keyboard())
+    state = calendar_creation_state.get(user_id)
+    if not state:
+        return
+
+    step = state["step"]
+
+    if step == "name":
+        state["name"] = message.text.strip()
+        state["step"] = "details"
+        await message.answer("Введите описание события:")
+    elif step == "details":
+        state["details"] = message.text.strip()
+        state["step"] = "date"
+        await message.answer("Введите дату события (ГГГГ-ММ-ДД):")
+    elif step == "date":
+        state["date"] = message.text.strip()
+        state["step"] = "time"
+        await message.answer("Введите время события (ЧЧ:ММ):")
+    elif step == "time":
+        state["time"] = message.text.strip()
+        # Проверяем корректность введённых данных
+        try:
+            datetime.strptime(state["date"], "%Y-%m-%d")
+            datetime.strptime(state["time"], "%H:%M")
+            event_id = calendar.create_event(
+                state["name"], state["date"], state["time"], state["details"]
+            )
+            await message.answer(
+                f"Событие '{state['name']}' добавлено в календарь!\nID: {event_id}",
+                reply_markup=main_keyboard()
+            )
+        except Exception:
+            await message.answer(
+                "Ошибка в данных события. Попробуйте создать событие заново.",
+                reply_markup=main_keyboard()
+            )
+        calendar_creation_state.pop(user_id, None)
+
+
+async def button_list_calendar_events(message: types.Message):
+    events = calendar.get_all_events()
+    if not events:
+        await message.answer("Событий пока нет.", reply_markup=main_keyboard())
+        return
+    lines = [
+        f"{e['id']}: {e['name']} | {e['date']} {e['time']} — {e['details']}"
+        for e in events
+    ]
+    await message.answer("Список событий:\n" + "\n".join(lines), reply_markup=main_keyboard())
+
+
+# Остальные обработчики (показ, изменение, удаление и т.д.) не менялись
+
+async def calendar_create_handler(message: types.Message):
+    await send_welcome(message)
+
+
+async def calendar_list_handler(message: types.Message):
+    events = calendar.get_all_events()
+    if not events:
+        await message.answer("Событий пока нет.")
+        return
+    lines = []
+    for e in events:
+        lines.append(f"{e['id']}: {e['name']} | {e['date']} {e['time']} — {e['details']}")
+    await message.answer("Список событий:\n" + "\n".join(lines))
+
+
+async def calendar_show_handler(message: types.Message):
+    args = message.text.strip().split()
+    if len(args) != 2:
+        await message.answer("Используй: /calendar_show <id>")
+        return
+    try:
+        event_id = int(args[1])
+        e = calendar.get_event(event_id)
+        if not e:
+            await message.answer("Событие не найдено.")
+            return
+        await message.answer(
+            f"Событие:\nID: {e['id']}\n"
+            f"Название: {e['name']}\n"
+            f"Дата: {e['date']} {e['time']}\n"
+            f"Описание: {e['details']}"
+        )
+    except Exception:
+        await message.answer("Ошибка. Проверь ID.")
+
+
+async def calendar_edit_handler(message: types.Message):
+    args = message.text.split(maxsplit=5)
+    if len(args) < 6:
+        await message.answer(
+            "Используй: /calendar_edit <id> <название> <дата> <время> <описание>"
+        )
+        return
+    try:
+        _, event_id, name, date, time, details = args
+        event_id = int(event_id)
+        result = calendar.edit_event(event_id, name, date, time, details)
+        if result:
+            await message.answer("Событие обновлено.")
+        else:
+            await message.answer("Событие не найдено.")
+    except Exception:
+        await message.answer("Ошибка. Проверь параметры.")
+
+
+async def calendar_delete_handler(message: types.Message):
+    args = message.text.strip().split()
+    if len(args) != 2:
+        await message.answer("Используй: /calendar_delete <id>")
+        return
+    try:
+        event_id = int(args[1])
+        result = calendar.delete_event(event_id)
+        if result:
+            await message.answer("Событие удалено.")
+        else:
+            await message.answer("Событие не найдено.")
+    except Exception:
+        await message.answer("Ошибка. Проверь ID.")
+
+
+calendar_delete_state = {}
+
+
+async def button_delete_calendar_event(message: types.Message):
+    user_id = message.from_user.id
+    calendar_delete_state[user_id] = True
+    await message.answer(
+        "Введите ID события, которое нужно удалить:",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+
+
+async def process_calendar_deletion(message: types.Message):
+    user_id = message.from_user.id
+    if not calendar_delete_state.get(user_id):
+        return
+    try:
+        event_id = int(message.text.strip())
+        result = calendar.delete_event(event_id)
+        if result:
+            await message.answer("Событие удалено.", reply_markup=main_keyboard())
+        else:
+            await message.answer("Событие с таким ID не найдено.", reply_markup=main_keyboard())
+    except Exception:
+        await message.answer("Некорректный ID. Пожалуйста, попробуйте снова.", reply_markup=main_keyboard())
+    calendar_delete_state.pop(user_id, None)
+
+
+calendar_edit_state = {}
+
+
+async def button_edit_calendar_event(message: types.Message):
+    user_id = message.from_user.id
+    calendar_edit_state[user_id] = {"step": "id"}
+    await message.answer(
+        "Введите ID изменяемого события:",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+
+
+async def process_calendar_editing(message: types.Message):
+    user_id = message.from_user.id
+    state = calendar_edit_state.get(user_id)
+    if not state:
+        return
+
+    if state["step"] == "id":
+        try:
+            event_id = int(message.text.strip())
+            event = calendar.get_event(event_id)
+            if not event:
+                await message.answer(
+                    "Событие с таким ID не найдено.", reply_markup=main_keyboard()
+                )
+                calendar_edit_state.pop(user_id, None)
+                return
+            state["id"] = event_id
+            state["step"] = "name"
+            await message.answer(f"Текущее название: {event['name']}\nВведите новое название:")
+        except Exception:
+            await message.answer("Некорректный ID. Попробуйте ещё раз:", reply_markup=main_keyboard())
+            calendar_edit_state.pop(user_id, None)
+    elif state["step"] == "name":
+        state["name"] = message.text.strip()
+        state["step"] = "date"
+        await message.answer("Введите новую дату (ГГГГ-ММ-ДД):")
+    elif state["step"] == "date":
+        state["date"] = message.text.strip()
+        state["step"] = "time"
+        await message.answer("Введите новое время (ЧЧ:ММ):")
+    elif state["step"] == "time":
+        state["time"] = message.text.strip()
+        state["step"] = "details"
+        await message.answer("Введите новое описание:")
+    elif state["step"] == "details":
+        state["details"] = message.text.strip()
+        try:
+            datetime.strptime(state["date"], "%Y-%m-%d")
+            datetime.strptime(state["time"], "%H:%M")
+            result = calendar.edit_event(
+                state["id"], state["name"], state["date"], state["time"], state["details"]
+            )
+            if result:
+                await message.answer(
+                    "Событие изменено успешно!", reply_markup=main_keyboard()
+                )
+            else:
+                await message.answer("Событие не найдено.", reply_markup=main_keyboard())
+        except Exception:
+            await message.answer("Ошибка в формате даты или времени!", reply_markup=main_keyboard())
+        calendar_edit_state.pop(user_id, None)
 
 
 def register_handlers(dp: Dispatcher):
     dp.message.register(send_welcome, Command("start"))
-    dp.message.register(button_create_note, F.text == "Создать заметку")
-    dp.message.register(button_list_notes, F.text == "Показать мои заметки")
-    dp.message.register(button_list_sorted_notes, F.text == "Показать отсортированные заметки")
-    dp.message.register(save_new_note, F.reply_to_message & F.reply_to_message.text == "Введите текст новой заметки:")
-    dp.message.register(save_edited_note, lambda msg: msg.from_user.id in edit_states and not msg.text.startswith('/'))
-    dp.callback_query.register(delete_callback_handler, F.data.startswith("del_"))
-    dp.callback_query.register(edit_callback_handler, F.data.startswith("edit_"))
+    dp.message.register(button_create_calendar_event, F.text == "📆 Календарь: создать событие")
+    dp.message.register(button_list_calendar_events, F.text == "📅 Календарь: список событий")
+    dp.message.register(process_calendar_creation,
+                        lambda msg: calendar_creation_state.get(msg.from_user.id) is not None)
+    dp.message.register(calendar_create_handler, Command("calendar_create"))
+    dp.message.register(calendar_list_handler, Command("calendar_list"))
+    dp.message.register(calendar_show_handler, Command("calendar_show"))
+    dp.message.register(calendar_edit_handler, Command("calendar_edit"))
+    dp.message.register(calendar_delete_handler, Command("calendar_delete"))
+
+    dp.message.register(button_delete_calendar_event, F.text == "📆 Календарь: удалить событие")
+    dp.message.register(process_calendar_deletion,
+                        lambda msg: calendar_delete_state.get(msg.from_user.id) is not None)
