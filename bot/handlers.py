@@ -67,7 +67,7 @@ async def process_calendar_creation(message: types.Message):
             datetime.strptime(state["date"], "%Y-%m-%d")
             datetime.strptime(state["time"], "%H:%M")
             event_id = calendar.create_event(
-                state["name"], state["date"], state["time"], state["details"]
+                user_id, state["name"], state["date"], state["time"], state["details"]
             )
             await message.answer(
                 f"Событие '{state['name']}' добавлено в календарь!\nID: {event_id}",
@@ -82,7 +82,8 @@ async def process_calendar_creation(message: types.Message):
 
 
 async def button_list_calendar_events(message: types.Message):
-    events = calendar.get_all_events()
+    user_id = message.from_user.id
+    events = calendar.get_all_events(user_id)
     if not events:
         await message.answer("Событий пока нет.", reply_markup=main_keyboard())
         return
@@ -93,14 +94,13 @@ async def button_list_calendar_events(message: types.Message):
     await message.answer("Список событий:\n" + "\n".join(lines), reply_markup=main_keyboard())
 
 
-# Остальные обработчики (показ, изменение, удаление и т.д.) не менялись
-
 async def calendar_create_handler(message: types.Message):
     await send_welcome(message)
 
 
 async def calendar_list_handler(message: types.Message):
-    events = calendar.get_all_events()
+    user_id = message.from_user.id
+    events = calendar.get_all_events(user_id)
     if not events:
         await message.answer("Событий пока нет.")
         return
@@ -117,7 +117,8 @@ async def calendar_show_handler(message: types.Message):
         return
     try:
         event_id = int(args[1])
-        e = calendar.get_event(event_id)
+        user_id = message.from_user.id
+        e = calendar.get_event(user_id, event_id)
         if not e:
             await message.answer("Событие не найдено.")
             return
@@ -132,7 +133,8 @@ async def calendar_show_handler(message: types.Message):
 
 
 async def calendar_edit_handler(message: types.Message):
-    args = message.text.split(maxsplit=5)
+    user_id = message.from_user.id
+    args = message.text.strip().split(maxsplit=5)
     if len(args) < 6:
         await message.answer(
             "Используй: /calendar_edit <id> <название> <дата> <время> <описание>"
@@ -141,7 +143,7 @@ async def calendar_edit_handler(message: types.Message):
     try:
         _, event_id, name, date, time, details = args
         event_id = int(event_id)
-        result = calendar.edit_event(event_id, name, date, time, details)
+        result = calendar.edit_event(user_id, event_id, name, date, time, details)
         if result:
             await message.answer("Событие обновлено.")
         else:
@@ -151,13 +153,14 @@ async def calendar_edit_handler(message: types.Message):
 
 
 async def calendar_delete_handler(message: types.Message):
+    user_id = message.from_user.id
     args = message.text.strip().split()
     if len(args) != 2:
         await message.answer("Используй: /calendar_delete <id>")
         return
     try:
         event_id = int(args[1])
-        result = calendar.delete_event(event_id)
+        result = calendar.delete_event(user_id, event_id)
         if result:
             await message.answer("Событие удалено.")
         else:
@@ -184,7 +187,7 @@ async def process_calendar_deletion(message: types.Message):
         return
     try:
         event_id = int(message.text.strip())
-        result = calendar.delete_event(event_id)
+        result = calendar.delete_event(user_id, event_id)
         if result:
             await message.answer("Событие удалено.", reply_markup=main_keyboard())
         else:
@@ -215,7 +218,7 @@ async def process_calendar_editing(message: types.Message):
     if state["step"] == "id":
         try:
             event_id = int(message.text.strip())
-            event = calendar.get_event(event_id)
+            event = calendar.get_event(user_id, event_id)
             if not event:
                 await message.answer(
                     "Событие с таким ID не найдено.", reply_markup=main_keyboard()
@@ -246,7 +249,7 @@ async def process_calendar_editing(message: types.Message):
             datetime.strptime(state["date"], "%Y-%m-%d")
             datetime.strptime(state["time"], "%H:%M")
             result = calendar.edit_event(
-                state["id"], state["name"], state["date"], state["time"], state["details"]
+                user_id, state["id"], state["name"], state["date"], state["time"], state["details"]
             )
             if result:
                 await message.answer(
