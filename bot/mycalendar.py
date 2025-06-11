@@ -1,100 +1,94 @@
-import psycopg2
+from calendarapp.models import User, Event
+from asgiref.sync import sync_to_async
 
 
 class Calendar:
-    def __init__(self, conn):
-        self.conn = conn
-        # Создание таблицы при необходимости
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS events (
-                    id SERIAL PRIMARY KEY,
-                    user_id BIGINT NOT NULL,
-                    name TEXT NOT NULL,
-                    date DATE NOT NULL,
-                    time TIME NOT NULL,
-                    details TEXT
-                );
-            """)
-            self.conn.commit()
-
-    def create_event(self, user_id, event_name, event_date, event_time, event_details):
-        with self.conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO events (user_id, name, date, time, details)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id
-                """,
-                (user_id, event_name, event_date, event_time, event_details),
+    async def register_user(self, telegram_id, username=None):
+        try:
+            await sync_to_async(User.objects.get_or_create)(
+                telegram_id=telegram_id,
+                defaults={'username': username}
             )
-            event_id = cur.fetchone()[0]
-            self.conn.commit()
-            return event_id
+            return True
+        except Exception:
+            return False
 
-    def get_event(self, user_id, event_id):
-        with self.conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, name, date, time, details FROM events WHERE id=%s AND user_id=%s",
-                (event_id, user_id)
-            )
-            row = cur.fetchone()
-            if row:
-                return {
-                    "id": row[0],
-                    "name": row[1],
-                    "date": str(row[2]),
-                    "time": str(row[3]),
-                    "details": row[4]
-                }
+    async def is_registered(self, telegram_id):
+        return await sync_to_async(User.objects.filter(telegram_id=telegram_id).exists)()
+
+    async def get_user_db_id(self, telegram_id):
+        try:
+            user = await sync_to_async(User.objects.get)(telegram_id=telegram_id)
+            return user.id
+        except User.DoesNotExist:
             return None
 
-    def get_all_events(self, user_id):
-        with self.conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, name, date, time, details FROM events WHERE user_id=%s ORDER BY date, time",
-                (user_id,)
+    async def create_event(self, user_id, event_name, event_date, event_time, event_details):
+        try:
+            user = await sync_to_async(User.objects.get)(id=user_id)
+            event = await sync_to_async(Event.objects.create)(
+                user=user,
+                name=event_name,
+                date=event_date,
+                time=event_time,
+                details=event_details
             )
-            rows = cur.fetchall()
-            return [
-                {
-                    "id": r[0],
-                    "name": r[1],
-                    "date": str(r[2]),
-                    "time": str(r[3]),
-                    "details": r[4]
-                }
-                for r in rows
-            ]
+            return event.id
+        except Exception:
+            return None
 
-    def edit_event(self, user_id, event_id, event_name=None, event_date=None, event_time=None, event_details=None):
-        columns = []
-        values = []
-        if event_name:
-            columns.append("name=%s")
-            values.append(event_name)
-        if event_date:
-            columns.append("date=%s")
-            values.append(event_date)
-        if event_time:
-            columns.append("time=%s")
-            values.append(event_time)
-        if event_details:
-            columns.append("details=%s")
-            values.append(event_details)
-        if not columns:
-            return False  # ничего не меняется
-        values.extend([event_id, user_id])
-        with self.conn.cursor() as cur:
-            cur.execute(
-                f"UPDATE events SET {', '.join(columns)} WHERE id=%s AND user_id=%s",
-                values
-            )
-            self.conn.commit()
-            return cur.rowcount > 0
+    async def get_event(self, user_id, event_id):
+        try:
+            event = await sync_to_async(Event.objects.get)(id=event_id, user_id=user_id)
+            return {
+                "id": event.id,
+                "name": event.name,
+                "date": str(event.date),
+                "time": str(event.time),
+                "details": event.details
+            }
+        except Event.DoesNotExist:
+            return None
 
-    def delete_event(self, user_id, event_id):
-        with self.conn.cursor() as cur:
-            cur.execute("DELETE FROM events WHERE id=%s AND user_id=%s", (event_id, user_id))
-            self.conn.commit()
-            return cur.rowcount > 0
+    async def get_all_events(self, user_id):
+        events = []
+        async for event in Event.objects.filter(user_id=user_id).order_by('date', 'time'):
+            events.append(event)
+
+        return [
+            {
+                "id": e.id,
+                "name": e.name,
+                "date": str(e.date),
+                "time": str(e.time),
+                "details": e.details
+            }
+            for e in events
+        ]
+
+    async def edit_event(self, user_id, event_id, event_name=None, event_date=None, event_time=None,
+                         event_details=None):
+        try:
+            event = await sync_to_async(Event.objects.get)(id=event_id, user_id=user_id)
+            changed = False
+            if event_name:
+                event.name = event_name
+                changed = True
+            if event_date:
+                event.date = event_date
+                changed = True
+            if event_time:
+                event.time = event_time
+                changed = True
+            if event_details:
+                event.details = event_details
+                changed = True
+            if changed:
+                await sync_to_async(event.save)()
+            return changed
+        except Event.DoesNotExist:
+            return False
+
+    async def delete_event(self, user_id, event_id):
+        deleted, _ = await sync_to_async(Event.objects.filter(id=event_id, user_id=user_id).delete)()
+        return deleted > 0

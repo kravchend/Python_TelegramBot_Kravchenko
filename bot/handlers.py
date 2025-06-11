@@ -31,8 +31,34 @@ async def send_welcome(message: types.Message):
     )
 
 
+async def get_user_id(message):
+    telegram_id = message.from_user.id
+    return await calendar.get_user_db_id(telegram_id)
+
+
+async def register_user_handler(message: types.Message):
+    telegram_id = message.from_user.id
+    username = message.from_user.username
+
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if user_id:
+        await message.answer("Вы уже зарегистрированы.")
+        return
+
+    res = await calendar.register_user(telegram_id, username)
+    if res:
+        await message.answer("Регистрация успешна! Теперь вы можете пользоваться ботом.")
+    else:
+        await message.answer("Ошибка регистрации. Попробуйте позже.")
+
+
 async def button_create_calendar_event(message: types.Message):
-    user_id = message.from_user.id
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
     calendar_creation_state[user_id] = {"step": "name"}
     await message.answer(
         "Введите название события:",
@@ -41,7 +67,12 @@ async def button_create_calendar_event(message: types.Message):
 
 
 async def process_calendar_creation(message: types.Message):
-    user_id = message.from_user.id
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
     state = calendar_creation_state.get(user_id)
     if not state:
         return
@@ -62,11 +93,10 @@ async def process_calendar_creation(message: types.Message):
         await message.answer("Введите время события (ЧЧ:ММ):")
     elif step == "time":
         state["time"] = message.text.strip()
-        # Проверяем корректность введённых данных
         try:
             datetime.strptime(state["date"], "%Y-%m-%d")
             datetime.strptime(state["time"], "%H:%M")
-            event_id = calendar.create_event(
+            event_id = await calendar.create_event(
                 user_id, state["name"], state["date"], state["time"], state["details"]
             )
             await message.answer(
@@ -82,8 +112,13 @@ async def process_calendar_creation(message: types.Message):
 
 
 async def button_list_calendar_events(message: types.Message):
-    user_id = message.from_user.id
-    events = calendar.get_all_events(user_id)
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
+    events = await calendar.get_all_events(user_id)
     if not events:
         await message.answer("Событий пока нет.", reply_markup=main_keyboard())
         return
@@ -99,8 +134,13 @@ async def calendar_create_handler(message: types.Message):
 
 
 async def calendar_list_handler(message: types.Message):
-    user_id = message.from_user.id
-    events = calendar.get_all_events(user_id)
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
+    events = await calendar.get_all_events(user_id)
     if not events:
         await message.answer("Событий пока нет.")
         return
@@ -117,8 +157,13 @@ async def calendar_show_handler(message: types.Message):
         return
     try:
         event_id = int(args[1])
-        user_id = message.from_user.id
-        e = calendar.get_event(user_id, event_id)
+        telegram_id = message.from_user.id
+        user_id = await calendar.get_user_db_id(telegram_id)
+        if not user_id:
+            await message.answer("Вы не зарегистрированы. Используйте /register")
+            return
+
+        e = await calendar.get_event(user_id, event_id)
         if not e:
             await message.answer("Событие не найдено.")
             return
@@ -133,7 +178,12 @@ async def calendar_show_handler(message: types.Message):
 
 
 async def calendar_edit_handler(message: types.Message):
-    user_id = message.from_user.id
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
     args = message.text.strip().split(maxsplit=5)
     if len(args) < 6:
         await message.answer(
@@ -143,7 +193,7 @@ async def calendar_edit_handler(message: types.Message):
     try:
         _, event_id, name, date, time, details = args
         event_id = int(event_id)
-        result = calendar.edit_event(user_id, event_id, name, date, time, details)
+        result = await calendar.edit_event(user_id, event_id, name, date, time, details)
         if result:
             await message.answer("Событие обновлено.")
         else:
@@ -153,14 +203,19 @@ async def calendar_edit_handler(message: types.Message):
 
 
 async def calendar_delete_handler(message: types.Message):
-    user_id = message.from_user.id
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
     args = message.text.strip().split()
     if len(args) != 2:
         await message.answer("Используй: /calendar_delete <id>")
         return
     try:
         event_id = int(args[1])
-        result = calendar.delete_event(user_id, event_id)
+        result = await calendar.delete_event(user_id, event_id)
         if result:
             await message.answer("Событие удалено.")
         else:
@@ -173,7 +228,12 @@ calendar_delete_state = {}
 
 
 async def button_delete_calendar_event(message: types.Message):
-    user_id = message.from_user.id
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
     calendar_delete_state[user_id] = True
     await message.answer(
         "Введите ID события, которое нужно удалить:",
@@ -182,12 +242,17 @@ async def button_delete_calendar_event(message: types.Message):
 
 
 async def process_calendar_deletion(message: types.Message):
-    user_id = message.from_user.id
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
     if not calendar_delete_state.get(user_id):
         return
     try:
         event_id = int(message.text.strip())
-        result = calendar.delete_event(user_id, event_id)
+        result = await calendar.delete_event(user_id, event_id)
         if result:
             await message.answer("Событие удалено.", reply_markup=main_keyboard())
         else:
@@ -201,7 +266,12 @@ calendar_edit_state = {}
 
 
 async def button_edit_calendar_event(message: types.Message):
-    user_id = message.from_user.id
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
     calendar_edit_state[user_id] = {"step": "id"}
     await message.answer(
         "Введите ID изменяемого события:",
@@ -210,7 +280,12 @@ async def button_edit_calendar_event(message: types.Message):
 
 
 async def process_calendar_editing(message: types.Message):
-    user_id = message.from_user.id
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register")
+        return
+
     state = calendar_edit_state.get(user_id)
     if not state:
         return
@@ -218,7 +293,7 @@ async def process_calendar_editing(message: types.Message):
     if state["step"] == "id":
         try:
             event_id = int(message.text.strip())
-            event = calendar.get_event(user_id, event_id)
+            event = await calendar.get_event(user_id, event_id)
             if not event:
                 await message.answer(
                     "Событие с таким ID не найдено.", reply_markup=main_keyboard()
@@ -248,7 +323,7 @@ async def process_calendar_editing(message: types.Message):
         try:
             datetime.strptime(state["date"], "%Y-%m-%d")
             datetime.strptime(state["time"], "%H:%M")
-            result = calendar.edit_event(
+            result = await calendar.edit_event(
                 user_id, state["id"], state["name"], state["date"], state["time"], state["details"]
             )
             if result:
@@ -263,6 +338,7 @@ async def process_calendar_editing(message: types.Message):
 
 
 def register_handlers(dp: Dispatcher):
+    dp.message.register(register_user_handler, Command("register"))
     dp.message.register(send_welcome, Command("start"))
     dp.message.register(button_create_calendar_event, F.text == "📆 Календарь: создать событие")
     dp.message.register(button_list_calendar_events, F.text == "📅 Календарь: список событий")
