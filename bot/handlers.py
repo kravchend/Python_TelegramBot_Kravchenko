@@ -344,7 +344,6 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(button_list_calendar_events, F.text == "📅 Календарь: список событий")
     dp.message.register(process_calendar_creation,
                         lambda msg: calendar_creation_state.get(msg.from_user.id) is not None)
-
     dp.message.register(calendar_create_handler, Command("calendar_create"))
     dp.message.register(calendar_list_handler, Command("calendar_list"))
     dp.message.register(calendar_show_handler, Command("calendar_show"))
