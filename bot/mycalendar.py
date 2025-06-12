@@ -1,14 +1,33 @@
-from calendarapp.models import User, Event
+from calendarapp.models import User, Event, BotStatistics, Appointment
 from asgiref.sync import sync_to_async
+from datetime import datetime
+from django.db import models
 
 
 class Calendar:
+    async def _increment_stat(self, field):
+        today = datetime.now().date()
+        stats, _ = await sync_to_async(BotStatistics.objects.get_or_create)(
+            date=today,
+            defaults={
+                'user_count': 0,
+                'event_count': 0,
+                'edited_events': 0,
+                'cancelled_events': 0,
+            }
+        )
+        if hasattr(stats, field):
+            setattr(stats, field, getattr(stats, field) + 1)
+            await sync_to_async(stats.save)()
+
     async def register_user(self, telegram_id, username=None):
         try:
-            await sync_to_async(User.objects.get_or_create)(
+            user, created = await sync_to_async(User.objects.get_or_create)(
                 telegram_id=telegram_id,
                 defaults={'username': username}
             )
+            if created:
+                await self._increment_stat('user_count')
             return True
         except Exception:
             return False
@@ -33,6 +52,7 @@ class Calendar:
                 time=event_time,
                 details=event_details
             )
+            await self._increment_stat('event_count')
             return event.id
         except Exception:
             return None
@@ -85,10 +105,45 @@ class Calendar:
                 changed = True
             if changed:
                 await sync_to_async(event.save)()
+                await self._increment_stat('edited_events')
             return changed
         except Event.DoesNotExist:
             return False
 
     async def delete_event(self, user_id, event_id):
         deleted, _ = await sync_to_async(Event.objects.filter(id=event_id, user_id=user_id).delete)()
+        if deleted > 0:
+            await self._increment_stat('cancelled_events')
         return deleted > 0
+
+    async def get_busy_appointments(self, user, date=None):
+        q = Appointment.objects.filter(
+            models.Q(organizer=user) | models.Q(invitee=user),
+            status__in=['pending', 'confirmed']
+        )
+        if date:
+            q = q.filter(date=date)
+        return await sync_to_async(lambda: list(q.values('date', 'time', 'status', 'event_id')))()
+
+    async def invite_user_to_event(self, organizer, invitee, event, date, time, details=""):
+        conflict = await sync_to_async(
+            Appointment.objects.filter(
+                invitee=invitee,
+                date=date,
+                time=time,
+                status__in=['pending', 'confirmed']
+            ).exists
+        )()
+        if conflict:
+            return None  # Пользователь занят
+
+        appt = await sync_to_async(Appointment.objects.create)(
+            organizer=organizer,
+            invitee=invitee,
+            event=event,
+            date=date,
+            time=time,
+            details=details,
+            status='pending'
+        )
+        return appt
