@@ -4,6 +4,7 @@ from bot.calendar_instance import calendar
 from datetime import datetime
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 from calendarapp.models import User, Event, Appointment
 from asgiref.sync import sync_to_async
 
@@ -12,6 +13,10 @@ router = Router()
 
 def main_keyboard():
     keyboard = [
+        [
+            types.KeyboardButton(text="📆 Календарь")
+        ],
+
         [
             types.KeyboardButton(text="📆 Календарь: создать событие"),
             types.KeyboardButton(text="📅 Календарь: список событий"),
@@ -29,6 +34,34 @@ def appointment_action_keyboard(appointment_id):
         [InlineKeyboardButton(text="Подтвердить", callback_data=f"appt_confirm_{appointment_id}")],
         [InlineKeyboardButton(text="Отклонить", callback_data=f"appt_cancel_{appointment_id}")]
     ])
+
+
+@router.message(commands=["calendar"])
+async def user_calendar_handler(message: types.Message):
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer(
+            "Вы не зарегистрированы. Используйте /register.",
+            reply_markup=main_keyboard()
+        )
+        return
+    events = await calendar.get_all_events(user_id)
+    if not events:
+        await message.answer("У вас нет событий.", reply_markup=main_keyboard())
+        return
+    lines = [
+        f"{e['id']}: {e['name']} | {e['date']} {e['time']} — {e['details']}"
+        for e in events
+    ]
+    await message.answer("Ваш календарь:\n" + "\n".join(lines), reply_markup=main_keyboard())
+
+
+@router.message(F.text == "📆 Календарь")
+async def show_calendar_month(message: types.Message):
+    html_calendar, year, month = calendar.render_for_template()
+    txt = f"Календарь за {month:02}.{year}:\n\n"
+    await message.answer(txt + "(Открыть общий календарь на сайте: https://your-domain/calendar/)")
 
 
 @router.message(commands=["invite"])
@@ -505,6 +538,7 @@ async def process_calendar_editing(message: types.Message):
 def register_handlers(router: Router):
     router.message.register(send_welcome, Command("start"))
     router.message.register(register_user_handler, Command("register"))
+    router.message.register(user_calendar_handler, Command("calendar"))
     router.message.register(button_create_calendar_event, F.text == "📆 Календарь: создать событие")
     router.message.register(button_list_calendar_events, F.text == "📅 Календарь: список событий")
     router.message.register(process_calendar_creation,

@@ -3,8 +3,11 @@ from django.db import models
 
 class User(models.Model):
     telegram_id = models.BigIntegerField(unique=True)
-    username = models.TextField(blank=True, null=True)
+    username = models.CharField(max_length=150, blank=True, null=True)
     registered_at = models.DateTimeField(auto_now_add=True)
+    events_created = models.PositiveIntegerField(default=0)
+    events_edited = models.PositiveIntegerField(default=0)
+    events_cancelled = models.PositiveIntegerField(default=0)
 
     class Meta:
         db_table = 'users'
@@ -38,6 +41,7 @@ class Event(models.Model):
 
 
 class BotStatistics(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     date = models.DateField()
     user_count = models.PositiveIntegerField()
     event_count = models.PositiveIntegerField()

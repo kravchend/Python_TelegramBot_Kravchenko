@@ -2,9 +2,18 @@ from calendarapp.models import User, Event, BotStatistics, Appointment
 from asgiref.sync import sync_to_async
 from datetime import datetime
 from django.db import models
+import calendar as pycalendar
 
 
 class Calendar:
+    def render_for_template(self, year=None, month=None):
+        now = datetime.now()
+        year = year or now.year
+        month = month or now.month
+        cal = pycalendar.HTMLCalendar(firstweekday=0)
+        html_calendar = cal.formatmonth(year, month)
+        return html_calendar, year, month
+
     async def _increment_stat(self, field):
         today = datetime.now().date()
         stats, _ = await sync_to_async(BotStatistics.objects.get_or_create)(
@@ -52,6 +61,8 @@ class Calendar:
                 time=event_time,
                 details=event_details
             )
+            user.events_created += 1
+            await sync_to_async(user.save)()
             await self._increment_stat('event_count')
             return event.id
         except Exception:
@@ -105,16 +116,26 @@ class Calendar:
                 changed = True
             if changed:
                 await sync_to_async(event.save)()
+                user = event.user
+                user.events_edited += 1
+                await sync_to_async(user.save)()
                 await self._increment_stat('edited_events')
             return changed
         except Event.DoesNotExist:
             return False
 
     async def delete_event(self, user_id, event_id):
-        deleted, _ = await sync_to_async(Event.objects.filter(id=event_id, user_id=user_id).delete)()
-        if deleted > 0:
-            await self._increment_stat('cancelled_events')
-        return deleted > 0
+        try:
+            event = await sync_to_async(Event.objects.get)(id=event_id, user_id=user_id)
+            user = event.user
+            deleted_count, _ = await sync_to_async(Event.objects.filter(id=event_id, user_id=user_id).delete)()
+            if deleted_count > 0:
+                user.events_cancelled += 1
+                await sync_to_async(user.save)()
+                await self._increment_stat('cancelled_events')
+            return deleted_count > 0
+        except Event.DoesNotExist:
+            return False
 
     async def get_busy_appointments(self, user, date=None):
         q = Appointment.objects.filter(
