@@ -2,11 +2,16 @@ from aiogram import F, Router, types
 from aiogram.filters import Command
 from bot.calendar_instance import calendar
 from datetime import datetime
+from bot.bot import bot
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from calendarapp.models import User, Event, Appointment
 from asgiref.sync import sync_to_async
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -29,6 +34,14 @@ def main_keyboard():
     return types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 
+def get_invite_keyboard(event_id):
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")
+    )
+    return markup
+
+
 def appointment_action_keyboard(appointment_id):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Подтвердить", callback_data=f"appt_confirm_{appointment_id}")],
@@ -36,7 +49,43 @@ def appointment_action_keyboard(appointment_id):
     ])
 
 
-@router.message(commands=["calendar"])
+async def get_user_events_with_index(user_id):
+    events = await calendar.get_all_events(user_id)
+    indexed = [
+        {**e, 'order': i + 1}
+        for i, e in enumerate(events)
+    ]
+    return indexed
+
+
+@router.callback_query(lambda c: c.data.startswith("edit_event_"))
+async def start_edit_event_callback(callback: types.CallbackQuery):
+    telegram_id = callback.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await callback.message.answer("Вы не зарегистрированы. Используйте /register", reply_markup=main_keyboard())
+        await callback.answer()
+        return
+
+    event_id = int(callback.data.split("_")[-1])
+    event = await calendar.get_event(user_id, event_id)
+    if not event:
+        await callback.message.answer("Событие не найдено.", reply_markup=main_keyboard())
+        await callback.answer()
+        return
+
+    calendar_edit_state[user_id] = {
+        "step": "name",
+        "id": event_id
+    }
+    await callback.message.answer(
+        f"Текущее название: {event['name']}\nВведите новое название:",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+    await callback.answer()
+
+
+@router.message(Command("calendar"))
 async def user_calendar_handler(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
@@ -64,7 +113,7 @@ async def show_calendar_month(message: types.Message):
     await message.answer(txt + "(Открыть общий календарь на сайте: https://your-domain/calendar/)")
 
 
-@router.message(commands=["invite"])
+@router.message(Command("invite"))
 async def command_invite_user(message: types.Message):
     args = message.text.strip().split()
     if len(args) != 5:
@@ -106,7 +155,7 @@ async def command_invite_user(message: types.Message):
     )
 
 
-@router.message(commands=["myappointments"])
+@router.message(Command("myappointments"))
 async def list_my_appointments(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
@@ -128,14 +177,13 @@ async def list_my_appointments(message: types.Message):
     await message.answer("Ваши встречи:\n" + "\n".join(lines))
 
 
-@router.message(commands=["pendingappointments"])
+@router.message(Command("pendingappointments"))
 async def list_pending_appointments(message: types.Message):
     telegram_id = message.from_user.id
     invitee = await calendar.get_user_db_id(telegram_id)
     if not invitee:
         await message.answer("Вы не зарегистрированы.", reply_markup=main_keyboard())
         return
-    # Получаем QuerySet синхронно, но асинхронно вызываем all()
     pending = await sync_to_async(lambda: list(Appointment.objects.filter(invitee=invitee, status='pending').all()))()
     if not pending:
         await message.answer("Нет ожидающих встреч.", reply_markup=main_keyboard())
@@ -151,9 +199,41 @@ async def list_pending_appointments(message: types.Message):
         )
 
 
-@router.callback_query(lambda c: c.data.startswith("appt_confirm_") or c.data.startswith("appt_cancel_"))
+@router.callback_query()
 async def appointment_action_callback(callback: types.CallbackQuery):
     data = callback.data
+    if data.startswith("appointment_accept:"):
+        appointment_id = int(data.split(":")[1])
+        appointment = Appointment.objects.filter(id=appointment_id).first()
+        if not appointment or appointment.status != "pending":
+            await callback.answer("Приглашение уже неактуально.", show_alert=True)
+            return
+        appointment.status = "confirmed"
+        appointment.save()
+        await callback.message.edit_text("Вы приняли приглашение.")
+        await bot.send_message(
+            appointment.organizer.telegram_id,
+            f"{appointment.invitee.username} принял приглашение на \"{appointment.event.name}\"."
+        )
+        await callback.answer("Вы приняли приглашение.")
+        return
+
+    if data.startswith("appointment_decline:"):
+        appointment_id = int(data.split(":")[1])
+        appointment = Appointment.objects.filter(id=appointment_id).first()
+        if not appointment or appointment.status != "pending":
+            await callback.answer("Приглашение уже неактуально.", show_alert=True)
+            return
+        appointment.status = "cancelled"
+        appointment.save()
+        await callback.message.edit_text("Вы отклонили приглашение.")
+        await bot.send_message(
+            appointment.organizer.telegram_id,
+            f"{appointment.invitee.username} отклонил приглашение на \"{appointment.event.name}\"."
+        )
+        await callback.answer("Вы отклонили приглашение.")
+        return
+
     appt_id = int(data.split("_")[-1])
     appt = await sync_to_async(Appointment.objects.get)(id=appt_id)
     if not appt:
@@ -174,6 +254,21 @@ async def appointment_action_callback(callback: types.CallbackQuery):
         appt.status = "cancelled"
         await sync_to_async(appt.save)()
         await callback.message.edit_text("Встреча отменена!")
+
+
+async def invite_user_handler(message, organizer, invitee, event):
+    appointment = calendar.invite_user_to_event(organizer, invitee, event)
+
+    if not appointment:
+        await message.answer("Пользователь уже приглашён или приглашение активно.")
+        return
+
+    await bot.send_message(
+        invitee.telegram_id,
+        f"Вас пригласили на событие '{event.name}' {event.date} в {event.time}.",
+        reply_markup=get_invite_keyboard(appointment.id)
+    )
+    await message.answer(f"Приглашение отправлено {invitee.username}.")
 
 
 calendar_creation_state = {}
@@ -226,7 +321,7 @@ async def button_create_calendar_event(message: types.Message):
         )
         return
 
-    calendar_creation_state[user_id] = {"step": "name"}
+    calendar_creation_state[telegram_id] = {"step": "name"}
     await message.answer(
         "Введите название события:",
         reply_markup=types.ReplyKeyboardRemove()
@@ -243,7 +338,7 @@ async def process_calendar_creation(message: types.Message):
         )
         return
 
-    state = calendar_creation_state.get(user_id)
+    state = calendar_creation_state.get(telegram_id)
     if not state:
         return
 
@@ -271,14 +366,14 @@ async def process_calendar_creation(message: types.Message):
             )
             await message.answer(
                 f"Событие '{state['name']}' добавлено в календарь!\nID: {event_id}",
-                reply_markup=main_keyboard()
+                reply_markup=get_invite_keyboard(event_id)
             )
         except Exception:
             await message.answer(
                 "Ошибка в данных события. Попробуйте создать событие заново.",
                 reply_markup=main_keyboard()
             )
-        calendar_creation_state.pop(user_id, None)
+        calendar_creation_state.pop(telegram_id, None)
 
 
 async def button_list_calendar_events(message: types.Message):
@@ -286,17 +381,17 @@ async def button_list_calendar_events(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            "Вы не зарегистрированы. Используйте /register",
+            "Вы не зарегистрированы. Используйте: /register",
             reply_markup=main_keyboard()
         )
         return
 
-    events = await calendar.get_all_events(user_id)
+    events = await get_user_events_with_index(user_id)
     if not events:
         await message.answer("Событий пока нет.", reply_markup=main_keyboard())
         return
     lines = [
-        f"{e['id']}: {e['name']} | {e['date']} {e['time']} — {e['details']}"
+        f"{e['order']}: {e['name']} | {e['date']} {e['time']} — {e['details']}"
         for e in events
     ]
     await message.answer("Список событий:\n" + "\n".join(lines), reply_markup=main_keyboard())
@@ -316,13 +411,11 @@ async def calendar_list_handler(message: types.Message):
         )
         return
 
-    events = await calendar.get_all_events(user_id)
+    events = await get_user_events_with_index(user_id)
     if not events:
         await message.answer("Событий пока нет.", reply_markup=main_keyboard())
         return
-    lines = []
-    for e in events:
-        lines.append(f"{e['id']}: {e['name']} | {e['date']} {e['time']} — {e['details']}")
+    lines = [f"{e['order']}: {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events]
     await message.answer("Список событий:\n" + "\n".join(lines))
 
 
@@ -397,17 +490,23 @@ async def calendar_delete_handler(message: types.Message):
 
     args = message.text.strip().split()
     if len(args) != 2:
-        await message.answer("Используй: /calendar_delete <id>", reply_markup=main_keyboard())
+        await message.answer("Используй: /calendar_delete <номер>", reply_markup=main_keyboard())
         return
     try:
-        event_id = int(args[1])
+        # Получаем все события пользователя с их номерами
+        events = await get_user_events_with_index(user_id)
+        num = int(args[1])
+        if not (1 <= num <= len(events)):
+            await message.answer("Некорректный номер. Попробуйте снова.", reply_markup=main_keyboard())
+            return
+        event_id = events[num - 1]["id"]
         result = await calendar.delete_event(user_id, event_id)
         if result:
             await message.answer("Событие удалено.", reply_markup=main_keyboard())
         else:
             await message.answer("Событие не найдено.", reply_markup=main_keyboard())
     except Exception:
-        await message.answer("Ошибка. Проверь ID.", reply_markup=main_keyboard())
+        await message.answer("Ошибка. Проверьте номер.", reply_markup=main_keyboard())
 
 
 calendar_delete_state = {}
@@ -423,9 +522,15 @@ async def button_delete_calendar_event(message: types.Message):
         )
         return
 
-    calendar_delete_state[user_id] = True
+    events = await get_user_events_with_index(user_id)
+    if not events:
+        await message.answer("У вас нет событий для удаления.", reply_markup=main_keyboard())
+        return
+
+    lines = [f"{e['order']}: {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events]
+    calendar_delete_state[telegram_id] = events  # сохраняем события пользователя
     await message.answer(
-        "Введите ID события, которое нужно удалить:",
+        "Введите номер события, которое хотите удалить:\n" + "\n".join(lines),
         reply_markup=types.ReplyKeyboardRemove()
     )
 
@@ -433,25 +538,39 @@ async def button_delete_calendar_event(message: types.Message):
 async def process_calendar_deletion(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
-    if not user_id:
+    if not user_id or telegram_id not in calendar_delete_state:
         await message.answer(
             "Вы не зарегистрированы. Используйте /register",
             reply_markup=main_keyboard()
         )
         return
 
-    if not calendar_delete_state.get(user_id):
-        return
+    events = calendar_delete_state.get(telegram_id)
     try:
-        event_id = int(message.text.strip())
+        num = int(message.text.strip())
+        await message.answer(f"DEBUG: num={num}, len={len(events)}; events orders: {[e['order'] for e in events]}")
+        if not (1 <= num <= len(events)):
+            raise ValueError
+        event_id = events[num - 1]["id"]
+        await message.answer(
+            f"DEBUG: Telegram ID: {telegram_id}, User DB ID: {user_id}, "
+            f"Удаляем event_id={event_id}, num={num}, всего событий={len(events)}"
+        )
         result = await calendar.delete_event(user_id, event_id)
         if result:
             await message.answer("Событие удалено.", reply_markup=main_keyboard())
+            calendar_delete_state.pop(telegram_id, None)
         else:
-            await message.answer("Событие с таким ID не найдено.", reply_markup=main_keyboard())
+            await message.answer("Событие не найдено.", reply_markup=main_keyboard())
+            calendar_delete_state.pop(telegram_id, None)
     except Exception:
-        await message.answer("Некорректный ID. Пожалуйста, попробуйте снова.", reply_markup=main_keyboard())
-    calendar_delete_state.pop(user_id, None)
+        lines = [
+            f"{e['order']}: {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events
+        ]
+        await message.answer(
+            "Некорректный номер. Попробуйте снова.\n\n"
+            + "\n".join(lines)
+        )
 
 
 calendar_edit_state = {}
@@ -467,72 +586,81 @@ async def button_edit_calendar_event(message: types.Message):
         )
         return
 
-    calendar_edit_state[user_id] = {"step": "id"}
+    events = await get_user_events_with_index(user_id)
+    if not events:
+        await message.answer("У вас нет событий для изменения.", reply_markup=main_keyboard())
+        return
+
+    lines = [f"{e['order']}. {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events]
+    calendar_edit_state[telegram_id] = {
+        "events": events,
+        "step": "num"
+    }
     await message.answer(
-        "Введите ID изменяемого события:",
+        "Введите номер события для редактирования:\n" + "\n".join(lines),
         reply_markup=types.ReplyKeyboardRemove()
     )
 
 
-async def process_calendar_editing(message: types.Message):
+async def process_calendar_editing_by_number(message: types.Message):
     telegram_id = message.from_user.id
-    user_id = await calendar.get_user_db_id(telegram_id)
-    if not user_id:
-        await message.answer(
-            "Вы не зарегистрированы. Используйте /register",
-            reply_markup=main_keyboard()
-        )
-        return
-
-    state = calendar_edit_state.get(user_id)
+    state = calendar_edit_state.get(telegram_id)
     if not state:
         return
 
-    if state["step"] == "id":
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("Вы не зарегистрированы. Используйте /register", reply_markup=main_keyboard())
+        calendar_edit_state.pop(telegram_id, None)
+        return
+
+    step = state["step"]
+
+    if step == "num":
         try:
-            event_id = int(message.text.strip())
-            event = await calendar.get_event(user_id, event_id)
-            if not event:
-                await message.answer(
-                    "Событие с таким ID не найдено.", reply_markup=main_keyboard()
-                )
-                calendar_edit_state.pop(user_id, None)
-                return
-            state["id"] = event_id
-            state["step"] = "name"
+            num = int(message.text.strip())
+            events = state["events"]
+            if not (1 <= num <= len(events)):
+                raise ValueError
+            event = events[num - 1]
+            state.update({
+                "id": event["id"],
+                "step": "name"
+            })
             await message.answer(f"Текущее название: {event['name']}\nВведите новое название:")
         except Exception:
-            await message.answer("Некорректный ID. Попробуйте ещё раз:", reply_markup=main_keyboard())
-            calendar_edit_state.pop(user_id, None)
-    elif state["step"] == "name":
+            await message.answer("Некорректный номер. Попробуйте снова.")
+            calendar_edit_state.pop(telegram_id, None)
+    elif step == "name":
         state["name"] = message.text.strip()
         state["step"] = "date"
         await message.answer("Введите новую дату (ГГГГ-ММ-ДД):")
-    elif state["step"] == "date":
+    elif step == "date":
         state["date"] = message.text.strip()
         state["step"] = "time"
         await message.answer("Введите новое время (ЧЧ:ММ):")
-    elif state["step"] == "time":
+    elif step == "time":
         state["time"] = message.text.strip()
         state["step"] = "details"
         await message.answer("Введите новое описание:")
-    elif state["step"] == "details":
+    elif step == "details":
         state["details"] = message.text.strip()
         try:
             datetime.strptime(state["date"], "%Y-%m-%d")
             datetime.strptime(state["time"], "%H:%M")
-            result = await calendar.edit_event(
-                user_id, state["id"], state["name"], state["date"], state["time"], state["details"]
-            )
-            if result:
-                await message.answer(
-                    "Событие изменено успешно!", reply_markup=main_keyboard()
-                )
-            else:
-                await message.answer("Событие не найдено.", reply_markup=main_keyboard())
-        except Exception:
+        except ValueError:
             await message.answer("Ошибка в формате даты или времени!", reply_markup=main_keyboard())
-        calendar_edit_state.pop(user_id, None)
+            calendar_edit_state.pop(telegram_id, None)
+            return
+
+        result = await calendar.edit_event(
+            user_id, state["id"], state["name"], state["date"], state["time"], state["details"]
+        )
+        if result:
+            await message.answer("Событие изменено!", reply_markup=main_keyboard())
+        else:
+            await message.answer("Событие не найдено.", reply_markup=main_keyboard())
+        calendar_edit_state.pop(telegram_id, None)
 
 
 def register_handlers(router: Router):
@@ -543,6 +671,10 @@ def register_handlers(router: Router):
     router.message.register(button_list_calendar_events, F.text == "📅 Календарь: список событий")
     router.message.register(process_calendar_creation,
                             lambda msg: calendar_creation_state.get(msg.from_user.id) is not None)
+    router.message.register(button_edit_calendar_event, F.text == "📆 Календарь: изменить событие")
+    router.message.register(process_calendar_editing_by_number,
+                            lambda msg: calendar_edit_state.get(msg.from_user.id) is not None)
+
     router.message.register(calendar_create_handler, Command("calendar_create"))
     router.message.register(calendar_list_handler, Command("calendar_list"))
     router.message.register(calendar_show_handler, Command("calendar_show"))

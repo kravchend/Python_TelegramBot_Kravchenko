@@ -3,6 +3,9 @@ from asgiref.sync import sync_to_async
 from datetime import datetime
 from django.db import models
 import calendar as pycalendar
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Calendar:
@@ -81,22 +84,6 @@ class Calendar:
         except Event.DoesNotExist:
             return None
 
-    async def get_all_events(self, user_id):
-        events = []
-        async for event in Event.objects.filter(user_id=user_id).order_by('date', 'time'):
-            events.append(event)
-
-        return [
-            {
-                "id": e.id,
-                "name": e.name,
-                "date": str(e.date),
-                "time": str(e.time),
-                "details": e.details
-            }
-            for e in events
-        ]
-
     async def edit_event(self, user_id, event_id, event_name=None, event_date=None, event_time=None,
                          event_details=None):
         try:
@@ -116,7 +103,8 @@ class Calendar:
                 changed = True
             if changed:
                 await sync_to_async(event.save)()
-                user = event.user
+                user_id = event.user_id
+                user = await sync_to_async(User.objects.get)(id=user_id)
                 user.events_edited += 1
                 await sync_to_async(user.save)()
                 await self._increment_stat('edited_events')
@@ -124,18 +112,39 @@ class Calendar:
         except Event.DoesNotExist:
             return False
 
-    async def delete_event(self, user_id, event_id):
+    @staticmethod
+    def _delete_event_sync(user_id, event_id):
         try:
-            event = await sync_to_async(Event.objects.get)(id=event_id, user_id=user_id)
+            event = Event.objects.get(id=event_id, user_id=user_id)
             user = event.user
-            deleted_count, _ = await sync_to_async(Event.objects.filter(id=event_id, user_id=user_id).delete)()
-            if deleted_count > 0:
+            deleted = event.delete()
+            if deleted[0] > 0:
                 user.events_cancelled += 1
-                await sync_to_async(user.save)()
-                await self._increment_stat('cancelled_events')
-            return deleted_count > 0
+                user.save()
+            return deleted[0] > 0
         except Event.DoesNotExist:
             return False
+        except Exception as e:
+            return False
+
+    async def delete_event(self, user_id, event_id):
+        result = await sync_to_async(self._delete_event_sync)(user_id, event_id)
+        if result:
+            await self._increment_stat('cancelled_events')
+        return result
+
+    async def get_all_events(self, user_id):
+        events = await sync_to_async(lambda: list(Event.objects.filter(user_id=user_id).order_by('date', 'time')))()
+        return [
+            {
+                "id": e.id,
+                "name": e.name,
+                "date": str(e.date),
+                "time": str(e.time),
+                "details": e.details
+            }
+            for e in events
+        ]
 
     async def get_busy_appointments(self, user, date=None):
         q = Appointment.objects.filter(
@@ -147,24 +156,20 @@ class Calendar:
         return await sync_to_async(lambda: list(q.values('date', 'time', 'status', 'event_id')))()
 
     async def invite_user_to_event(self, organizer, invitee, event, date, time, details=""):
-        conflict = await sync_to_async(
-            Appointment.objects.filter(
-                invitee=invitee,
-                date=date,
-                time=time,
-                status__in=['pending', 'confirmed']
-            ).exists
-        )()
-        if conflict:
-            return None  # Пользователь занят
-
-        appt = await sync_to_async(Appointment.objects.create)(
+        appointment, created = await sync_to_async(Appointment.objects.get_or_create)(
             organizer=organizer,
             invitee=invitee,
             event=event,
-            date=date,
-            time=time,
-            details=details,
-            status='pending'
+            defaults={
+                "date": event.date,
+                "time": event.time,
+                "details": event.details,
+                "status": "pending"
+            }
         )
-        return appt
+        if not created and appointment.status in ["pending", "confirmed"]:
+            return None
+        elif not created:
+            appointment.status = "pending"
+            appointment.save()
+        return appointment

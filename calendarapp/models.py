@@ -22,7 +22,6 @@ class Event(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        db_column='user_id',
         related_name='events'
     )
     name = models.CharField(max_length=255)
@@ -52,6 +51,7 @@ class BotStatistics(models.Model):
         db_table = 'bot_statistics'
         verbose_name = 'Статистика бота'
         verbose_name_plural = 'Статистика бота'
+        unique_together = ('user', 'date')
 
     def __str__(self):
         return f"Статистика за {self.date}"
