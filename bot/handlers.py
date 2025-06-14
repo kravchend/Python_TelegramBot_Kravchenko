@@ -1,8 +1,7 @@
-from aiogram import F, Router, types
+from aiogram import F, Router, types, Bot
 from aiogram.filters import Command
 from bot.calendar_instance import calendar
 from datetime import datetime
-from bot.bot import bot
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -14,6 +13,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+
+def get_bot():
+    from bot.loader import bot
+    return bot
+
+
+def get_appointment_model():
+    from calendarapp.models import User, Event, Appointment
+    return User, Event, Appointment
 
 
 def main_keyboard():
@@ -35,11 +44,35 @@ def main_keyboard():
 
 
 def get_invite_keyboard(event_id):
-    markup = InlineKeyboardMarkup()
-    markup.add(
-        InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")
+        ]]
     )
-    return markup
+
+
+def get_users_invite_keyboard(event_id, exclude_user_id):
+    users = list(User.objects.exclude(telegram_id=exclude_user_id))
+    inline_keyboard = []
+
+    for i in range(0, len(users), 2):
+        row = [
+            InlineKeyboardButton(
+                text=users[i].username or f"ID {users[i].telegram_id}",
+                callback_data=f"invite_{event_id}_{users[i].telegram_id}",
+            )
+        ]
+        if i + 1 < len(users):
+            row.append(
+                InlineKeyboardButton(
+                    text=users[i + 1].username or f"ID {users[i + 1].telegram_id}",
+                    callback_data=f"invite_{event_id}_{users[i + 1].telegram_id}",
+                )
+            )
+        inline_keyboard.append(row)
+    inline_keyboard.append([InlineKeyboardButton(text="Готово", callback_data="invite_done")])
+
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
 def appointment_action_keyboard(appointment_id):
@@ -56,6 +89,19 @@ async def get_user_events_with_index(user_id):
         for i, e in enumerate(events)
     ]
     return indexed
+
+
+@sync_to_async
+def get_appointment_by_id(app_id):
+    return Appointment.objects.get(pk=app_id)
+
+
+@sync_to_async
+def update_appointment_status(app_id, new_status):
+    appointment = Appointment.objects.get(pk=app_id)
+    appointment.status = new_status
+    appointment.save()
+    return appointment
 
 
 @router.callback_query(lambda c: c.data.startswith("edit_event_"))
@@ -107,7 +153,7 @@ async def user_calendar_handler(message: types.Message):
 
 
 @router.message(F.text == "📆 Календарь")
-async def show_calendar_month(message: types.Message):
+async def show_calendar_month(message: types.Message, bot: Bot):
     html_calendar, year, month = calendar.render_for_template()
     txt = f"Календарь за {month:02}.{year}:\n\n"
     await message.answer(txt + "(Открыть общий календарь на сайте: https://your-domain/calendar/)")
@@ -117,12 +163,16 @@ async def show_calendar_month(message: types.Message):
 async def command_invite_user(message: types.Message):
     args = message.text.strip().split()
     if len(args) != 5:
-        await message.answer("Используйте: /invite <telegram_id> <event_id> <date> <time>",
-                             reply_markup=main_keyboard())
+        await message.answer(
+            "Используйте: /invite <telegram_id> <event_id> <date> <time>",
+            reply_markup=main_keyboard()
+        )
         return
 
     _, invitee_telegram_id, event_id, date, time = args
     organizer_telegram_id = message.from_user.id
+
+    # Получаем пользователей
     organizer = await calendar.get_user_db_id(organizer_telegram_id)
     invitee = await calendar.get_user_db_id(int(invitee_telegram_id))
     event = await sync_to_async(Event.objects.get)(id=int(event_id))
@@ -134,20 +184,32 @@ async def command_invite_user(message: types.Message):
         )
         return
 
-    appt = await calendar.invite_user_to_event(
-        organizer=await sync_to_async(User.objects.get)(id=organizer),
-        invitee=await sync_to_async(User.objects.get)(id=invitee),
+    # Получаем объекты User
+    organizer_obj = await sync_to_async(User.objects.get)(id=organizer)
+    invitee_obj = await sync_to_async(User.objects.get)(id=invitee)
+    appt = await sync_to_async(calendar.invite_user_to_event)(
+        organizer=organizer_obj,
+        invitee=invitee_obj,
         event=event,
         date=date,
         time=time,
         details=f"Организатор {message.from_user.full_name}"
     )
+
     if not appt:
         await message.answer(
             "Этот пользователь занят в эти дату и время.",
             reply_markup=main_keyboard()
         )
         return
+
+    # Отправляем сообщения
+    bot = get_bot()
+    await bot.send_message(
+        invitee_telegram_id,
+        f"Вас пригласили на событие '{event.name}' {date} в {time}.",
+        reply_markup=get_invite_keyboard(appt.id)
+    )
 
     await message.answer(
         f"Приглашение отправлено! Ожидаем ответа.\nID встречи: {appt.id}",
@@ -202,14 +264,16 @@ async def list_pending_appointments(message: types.Message):
 @router.callback_query()
 async def appointment_action_callback(callback: types.CallbackQuery):
     data = callback.data
+    bot = get_bot()
+
     if data.startswith("appointment_accept:"):
         appointment_id = int(data.split(":")[1])
-        appointment = Appointment.objects.filter(id=appointment_id).first()
+        appointment = await sync_to_async(Appointment.objects.filter(id=appointment_id).first)()
         if not appointment or appointment.status != "pending":
             await callback.answer("Приглашение уже неактуально.", show_alert=True)
             return
         appointment.status = "confirmed"
-        appointment.save()
+        await sync_to_async(appointment.save)()
         await callback.message.edit_text("Вы приняли приглашение.")
         await bot.send_message(
             appointment.organizer.telegram_id,
@@ -220,12 +284,12 @@ async def appointment_action_callback(callback: types.CallbackQuery):
 
     if data.startswith("appointment_decline:"):
         appointment_id = int(data.split(":")[1])
-        appointment = Appointment.objects.filter(id=appointment_id).first()
+        appointment = await sync_to_async(Appointment.objects.filter(id=appointment_id).first)()
         if not appointment or appointment.status != "pending":
             await callback.answer("Приглашение уже неактуально.", show_alert=True)
             return
         appointment.status = "cancelled"
-        appointment.save()
+        await sync_to_async(appointment.save)()
         await callback.message.edit_text("Вы отклонили приглашение.")
         await bot.send_message(
             appointment.organizer.telegram_id,
@@ -235,10 +299,15 @@ async def appointment_action_callback(callback: types.CallbackQuery):
         return
 
     appt_id = int(data.split("_")[-1])
-    appt = await sync_to_async(Appointment.objects.get)(id=appt_id)
+    try:
+        appt = await sync_to_async(Appointment.objects.get)(id=appt_id)
+    except Appointment.DoesNotExist:
+        appt = None
+
     if not appt:
         await callback.answer("Встреча не найдена.", show_alert=True)
         return
+
     if callback.from_user.id != appt.invitee.telegram_id:
         await callback.answer(
             "Только приглашённый может подтвердить/отклонить встречу.",
@@ -246,6 +315,7 @@ async def appointment_action_callback(callback: types.CallbackQuery):
             show_alert=True
         )
         return
+
     if "confirm" in data:
         appt.status = "confirmed"
         await sync_to_async(appt.save)()
@@ -257,18 +327,22 @@ async def appointment_action_callback(callback: types.CallbackQuery):
 
 
 async def invite_user_handler(message, organizer, invitee, event):
-    appointment = calendar.invite_user_to_event(organizer, invitee, event)
+    appointment = await sync_to_async(calendar.invite_user_to_event)(organizer, invitee, event)
 
     if not appointment:
         await message.answer("Пользователь уже приглашён или приглашение активно.")
         return
 
+    bot = get_bot()
     await bot.send_message(
         invitee.telegram_id,
         f"Вас пригласили на событие '{event.name}' {event.date} в {event.time}.",
         reply_markup=get_invite_keyboard(appointment.id)
     )
-    await message.answer(f"Приглашение отправлено {invitee.username}.")
+    await message.answer(
+        f"Приглашение отправлено {invitee.username}.",
+        reply_markup=main_keyboard()
+    )
 
 
 calendar_creation_state = {}
@@ -328,6 +402,15 @@ async def button_create_calendar_event(message: types.Message):
     )
 
 
+async def offer_invite_after_event(message, event_id):
+    telegram_id = message.from_user.id
+    keyboard = get_users_invite_keyboard(event_id, exclude_user_id=telegram_id)
+    await message.answer(
+        "Событие создано! Кого пригласить?\n\nВыберите пользователя:",
+        reply_markup=keyboard
+    )
+
+
 async def process_calendar_creation(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
@@ -368,12 +451,67 @@ async def process_calendar_creation(message: types.Message):
                 f"Событие '{state['name']}' добавлено в календарь!\nID: {event_id}",
                 reply_markup=get_invite_keyboard(event_id)
             )
+            await offer_invite_after_event(message, event_id)
         except Exception:
             await message.answer(
                 "Ошибка в данных события. Попробуйте создать событие заново.",
                 reply_markup=main_keyboard()
             )
         calendar_creation_state.pop(telegram_id, None)
+
+
+@router.callback_query(lambda cq: cq.data.startswith("invite_event_"))
+async def invite_event_start_callback(callback_query: types.CallbackQuery):
+    # Открываем выбор пользователей по событию
+    _, _, event_id = callback_query.data.split("_")
+    telegram_id = callback_query.from_user.id
+    keyboard = get_users_invite_keyboard(event_id, exclude_user_id=telegram_id)
+    await callback_query.message.edit_text(
+        "Выберите, кого пригласить:", reply_markup=keyboard
+    )
+
+
+@router.callback_query(lambda cq: cq.data.startswith("invite_"))
+async def invite_user_callback(callback_query: types.CallbackQuery):
+    data = callback_query.data
+    if data == "invite_done":
+        await callback_query.message.edit_text(
+            "Приглашение завершено!", reply_markup=None
+        )
+        # Если нужно вернуть обычную клавиатуру, отправляй новое сообщение:
+        await callback_query.message.answer(
+            "Вы вернулись в главное меню.",
+            reply_markup=main_keyboard()
+        )
+        return
+
+    _, event_id, invitee_tg_id = data.split("_")
+    organizer_tg_id = callback_query.from_user.id
+    event = await sync_to_async(Event.objects.get)(id=event_id)
+    organizer = await sync_to_async(User.objects.get)(telegram_id=organizer_tg_id)
+    invitee = await sync_to_async(User.objects.get)(telegram_id=invitee_tg_id)
+
+    appointment = await sync_to_async(calendar.invite_user_to_event)(
+        organizer, invitee, event
+    )
+
+    if not appointment:
+        await callback_query.answer("Пользователь уже приглашён или приглашение активно.", show_alert=True)
+    else:
+        # Оповещение приглашённого
+        bot = get_bot()
+        await bot.send_message(
+            invitee.telegram_id,
+            f"Вас пригласили на событие '{event.name}' {event.date} в {event.time}.",
+            reply_markup=get_invite_keyboard(appointment.id)
+        )
+        await callback_query.answer(f"{invitee.username} приглашён!", show_alert=True)
+
+    # Повторное отображение клавиатуры для выбора других
+    keyboard = get_users_invite_keyboard(event.id, exclude_user_id=organizer_tg_id)
+    await callback_query.message.edit_text(
+        "Можно пригласить ещё пользователей:", reply_markup=keyboard
+    )
 
 
 async def button_list_calendar_events(message: types.Message):
