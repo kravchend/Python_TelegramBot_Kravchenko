@@ -8,12 +8,27 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class EventHTMLCalendar(pycalendar.HTMLCalendar):
+    def __init__(self, event_days, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.event_days = set(event_days)
+
+    def formatday(self, day, weekday):
+        if day == 0:
+            return '<td class="noday">&nbsp;</td>'
+        elif day in self.event_days:
+            return f'<td class="has-event" data-day="{day}">{day}<span class="event-dot">•</span></td>'
+        else:
+            return f'<td>{day}</td>'
+
+
 class Calendar:
-    def render_for_template(self, year=None, month=None):
+    def render_for_template(self, year=None, month=None, event_days=None):
         now = datetime.now()
         year = year or now.year
         month = month or now.month
-        cal = pycalendar.HTMLCalendar(firstweekday=0)
+        event_days = event_days or []
+        cal = EventHTMLCalendar(event_days, firstweekday=0)
         html_calendar = cal.formatmonth(year, month)
         return html_calendar, year, month
 
@@ -173,3 +188,22 @@ class Calendar:
             appointment.status = "pending"
             appointment.save()
         return appointment
+
+    def make_event_public(self, event_id: int, user_id: int) -> bool:
+        """Сделать событие публичным (только если пользователь — создатель события)"""
+        try:
+            event = Event.objects.get(id=event_id, user_id=user_id)
+            if event.is_public:
+                return False
+            event.is_public = True
+            event.save()
+            return True
+        except Event.DoesNotExist:
+            return False
+
+    def get_public_events(self, exclude_user_id: int = None):
+        """Получить публичные события других пользователей"""
+        qs = Event.objects.filter(is_public=True)
+        if exclude_user_id:
+            qs = qs.exclude(user_id=exclude_user_id)
+        return qs.order_by('date', 'time')

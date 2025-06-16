@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Статистика пользователя{% endblock %}
+
+{% block content %}
+    <h2>Статистика пользователя за последние 30 дней</h2>
+
+    {% if bot_stats %}
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Создано событий</th>
+                <th>Отредактировано</th>
+                <th>Отменено</th>
+                <th>Всего событий</th>
+                <th>Всего пользователей</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for stat in bot_stats %}
+                <tr>
+                    <td>{{ stat.date|date:"d.m.Y" }}</td>
+                    <td>{{ stat.event_count }}</td>
+                    <td>{{ stat.edited_events }}</td>
+                    <td>{{ stat.cancelled_events }}</td>
+                    <td>{{ stat.event_count }}</td>
+                    <td>{{ stat.user_count }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Нет данных статистики за выбранный период.</p>
+    {% endif %}
+{% endblock %}

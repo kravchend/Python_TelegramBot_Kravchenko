@@ -20,9 +20,9 @@ class UserAdmin(admin.ModelAdmin):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'date', 'time')
+    list_display = ('name', 'user', 'date', 'time', 'is_public')
     search_fields = ('name', 'user__username', 'user__telegram_id')
-    list_filter = ('date', 'user')
+    list_filter = ('date', 'user', 'is_public')
     list_select_related = ('user',)
     ordering = ('-date', '-time')
 

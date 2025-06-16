@@ -184,7 +184,6 @@ async def command_invite_user(message: types.Message):
         )
         return
 
-    # Получаем объекты User
     organizer_obj = await sync_to_async(User.objects.get)(id=organizer)
     invitee_obj = await sync_to_async(User.objects.get)(id=invitee)
     appt = await sync_to_async(calendar.invite_user_to_event)(
@@ -203,7 +202,6 @@ async def command_invite_user(message: types.Message):
         )
         return
 
-    # Отправляем сообщения
     bot = get_bot()
     await bot.send_message(
         invitee_telegram_id,
@@ -215,6 +213,51 @@ async def command_invite_user(message: types.Message):
         f"Приглашение отправлено! Ожидаем ответа.\nID встречи: {appt.id}",
         reply_markup=main_keyboard()
     )
+
+
+@router.message(Command("make_public"))
+async def make_public_handler(message: types.Message):
+    try:
+        event_number = int(message.get_args())
+        if event_number < 1:
+            raise ValueError
+    except (ValueError, AttributeError):
+        await message.answer("Укажите корректный номер события из списка: /make_public 1")
+        return
+
+    user_id = message.from_user.id
+
+    user_events = await sync_to_async(calendar.get_all_events)(user_id)
+    user_events = list(user_events)
+
+    if event_number > len(user_events):
+        await message.answer("Событие с таким номером не найдено.")
+        return
+
+    event = user_events[event_number - 1]
+    event_id = event.id
+
+    success = await sync_to_async(calendar.make_event_public)(event_id, user_id)
+    if success:
+        await message.answer("Событие сделано публичным!")
+    else:
+        await message.answer(
+            "Не удалось сделать событие публичным. Возможно, оно уже публичное или вы не являетесь его создателем.")
+
+
+@router.message(Command("list_public"))
+async def get_public_events_handler(message: types.Message):
+    user_id = message.from_user.id  # Или аналогично получить id пользователя
+    events = await sync_to_async(calendar.get_public_events)(exclude_user_id=user_id)
+
+    events = list(events)
+    if not events:
+        await message.answer("Публичных событий других пользователей пока нет.")
+    else:
+        text = "Публичные события:\n\n"
+        for event in events:
+            text += f"{event.name} — {event.date} {event.time}\n"
+        await message.answer(text)
 
 
 @router.message(Command("myappointments"))

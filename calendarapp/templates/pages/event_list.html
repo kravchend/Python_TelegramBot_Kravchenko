@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Ваши события</h2>
+    <a href="{% url 'event_create' %}" class="btn btn-success mb-3">+ Новое событие</a>
+    <ul>
+        {% for event in events %}
+            <li>
+                <strong>{{ event.name }}</strong> ({{ event.date }} {{ event.time }})
+                [<a href="{% url 'event_edit' event.pk %}">Редактировать</a>]
+                [<a href="{% url 'event_delete' event.pk %}">Удалить</a>]
+            </li>
+        {% empty %}
+            <li>Нет событий.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

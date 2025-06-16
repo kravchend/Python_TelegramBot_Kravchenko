@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Календарь — CalendarApp{% endblock %}
+
+{% block content %}
+    <style>
+        .has-event {
+            background: #ece4fc;
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .has-event:hover {
+            background: #ded5fa;
+        }
+
+        .event-dot {
+            color: #6843cc;
+            font-weight: bold;
+            position: absolute;
+            bottom: 4px;
+            right: 6px;
+            font-size: 1.2em;
+            line-height: 1;
+        }
+
+        .calendar td {
+            position: relative;
+            min-width: 34px;
+            height: 34px;
+            text-align: center;
+        }
+    </style>
+    <h2>Календарь на {{ month }}.{{ year }}</h2>
+    <div style="overflow-x: auto;">
+        {{ html_calendar|safe }}
+    </div>
+    <h3>Ваши события в этом месяце</h3>
+    {% if events %}
+        <table>
+            <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Название</th>
+                <th>Детали</th>
+                <th>Тип</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for event in events %}
+                <tr>
+                    <td>{{ event.date }}</td>
+                    <td>{{ event.time|default:"—" }}</td>
+                    <td>{{ event.name }}</td>
+                    <td>{{ event.details|default:"—" }}</td>
+                    <td>
+                        {% if event.is_public %}<span class="badge">Публичное</span>{% else %}Личное{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-msg">У вас пока нет событий на этот месяц.</div>
+    {% endif %}
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll(".has-event").forEach(td => {
+                td.onclick = function () {
+                    const day = this.getAttribute('data-day');
+                    // Здесь можно: открыть модалку, подсветить, загрузить события на этот день — дальше на ваше усмотрение!
+                    alert('События за ' + day + '.{{ month }}.{{ year }} отображаются ниже в таблице');
+                };
+            });
+        });
+    </script>
+{% endblock %}

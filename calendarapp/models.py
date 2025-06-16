@@ -1,9 +1,9 @@
 from django.db import models
+from django.contrib.auth.models import AbstractUser
 
 
-class User(models.Model):
-    telegram_id = models.BigIntegerField(unique=True)
-    username = models.CharField(max_length=150, blank=True, null=True)
+class User(AbstractUser):
+    telegram_id = models.BigIntegerField(null=True, blank=True, unique=True)
     registered_at = models.DateTimeField(auto_now_add=True)
     events_created = models.PositiveIntegerField(default=0)
     events_edited = models.PositiveIntegerField(default=0)
@@ -28,6 +28,7 @@ class Event(models.Model):
     date = models.DateField()
     time = models.TimeField()
     details = models.TextField(blank=True, null=True)
+    is_public = models.BooleanField(default=False, verbose_name='Публичное событие')
 
     class Meta:
         db_table = 'events'
