@@ -113,6 +113,7 @@
         <a href="{% url 'user_appointments' %}">Мои встречи</a>
         <a href="{% url 'logout' %}">Выйти</a>
     {% else %}
+
         <a href="{% url 'login' %}">Войти</a>
     {% endif %}
     <a href="{% url 'public_events' %}">Публичные события</a>
