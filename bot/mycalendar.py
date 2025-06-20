@@ -143,7 +143,8 @@ class Calendar:
             return False
 
     async def delete_event(self, user_id, event_id):
-        result = await sync_to_async(self._delete_event_sync)(user_id, event_id)
+        result = await sync_to_async(Calendar._delete_event_sync)(user_id, event_id)
+        print('delete_event result:', result)
         if result:
             await self._increment_stat('cancelled_events')
         return result
@@ -186,23 +187,21 @@ class Calendar:
             return None
         elif not created:
             appointment.status = "pending"
-            appointment.save()
+            await sync_to_async(appointment.save)()
         return appointment
 
-    def make_event_public(self, event_id: int, user_id: int) -> bool:
-        """Сделать событие публичным (только если пользователь — создатель события)"""
+    async def make_event_public(self, event_id: int, user_id: int) -> bool:
         try:
-            event = Event.objects.get(id=event_id, user_id=user_id)
+            event = await sync_to_async(Event.objects.get)(id=event_id, user_id=user_id)
             if event.is_public:
                 return False
             event.is_public = True
-            event.save()
+            await sync_to_async(event.save)()
             return True
         except Event.DoesNotExist:
             return False
 
     def get_public_events(self, exclude_user_id: int = None):
-        """Получить публичные события других пользователей"""
         qs = Event.objects.filter(is_public=True)
         if exclude_user_id:
             qs = qs.exclude(user_id=exclude_user_id)

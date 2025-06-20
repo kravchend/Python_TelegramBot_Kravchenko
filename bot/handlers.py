@@ -1,6 +1,7 @@
 from aiogram import F, Router, types, Bot
 from aiogram.filters import Command
 from bot.calendar_instance import calendar
+from dataclasses import dataclass
 from datetime import datetime
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -13,6 +14,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+
+@dataclass
+class DummyEvent:
+    id: str
+    name: str
+    details: str
+    date: datetime
+    time: datetime
+    is_public: bool = False
 
 
 def get_bot():
@@ -51,6 +62,13 @@ def get_invite_keyboard(event_id):
     )
 
 
+async def get_event_id_by_number(user_id, number):
+    events = Event.objects.filter(user_id=user_id).order_by('date', 'time')
+    if 1 <= number <= len(events):
+        return events[number - 1].id
+    return None
+
+
 def get_users_invite_keyboard(event_id, exclude_user_id):
     users = list(User.objects.exclude(telegram_id=exclude_user_id))
     inline_keyboard = []
@@ -75,10 +93,21 @@ def get_users_invite_keyboard(event_id, exclude_user_id):
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
+def event_public_action_keyboard(event_id, is_public):
+    if is_public:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔒 Сделать приватным", callback_data=f"event_private_{event_id}")]
+        ])
+    else:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🌐 Сделать публичным", callback_data=f"event_public_{event_id}")]
+        ])
+
+
 def appointment_action_keyboard(appointment_id):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Подтвердить", callback_data=f"appt_confirm_{appointment_id}")],
-        [InlineKeyboardButton(text="Отклонить", callback_data=f"appt_cancel_{appointment_id}")]
+        [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"appt_confirm_{appointment_id}")],
+        [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"appt_cancel_{appointment_id}")]
     ])
 
 
@@ -89,6 +118,74 @@ async def get_user_events_with_index(user_id):
         for i, e in enumerate(events)
     ]
     return indexed
+
+
+def render_event_message(event):
+    text = f"Событие: {event.name} | {event.date} {event.time}\n{event.details}"
+    keyboard = event_public_action_keyboard(event.id, getattr(event, 'is_public', False))
+    return text, keyboard
+
+
+@router.callback_query(lambda c: c.data.startswith("event_public_"))
+async def make_event_public_callback(callback: types.CallbackQuery):
+    event_id = int(callback.data.removeprefix("event_public_"))
+    try:
+        event = await sync_to_async(Event.objects.get)(id=event_id)
+        event.is_public = True
+        await sync_to_async(event.save)()
+        await callback.answer("Теперь это событие публичное.")
+        text, markup = render_event_message(event)
+        await callback.message.edit_text(text, reply_markup=markup)
+    except Event.DoesNotExist:
+        await callback.answer("Событие не найдено.", show_alert=True)
+
+
+@router.callback_query(lambda c: c.data.startswith("event_private_"))
+async def make_event_private_callback(callback: types.CallbackQuery):
+    event_id = int(callback.data.removeprefix("event_private_"))
+    try:
+        event = await sync_to_async(Event.objects.get)(id=event_id)
+        event.is_public = False
+        event.save()
+        await callback.answer("Теперь это событие приватное.")
+        text, markup = render_event_message(event)
+        await callback.message.edit_text(text, reply_markup=markup)
+    except Event.DoesNotExist:
+        await callback.answer("Событие не найдено.", show_alert=True)
+
+
+@router.message(Command("public_events"))
+async def get_public_events_handler(message: types.Message):
+    from calendarapp.models import Event, User
+
+    args = message.get_args().strip()
+    if args.startswith('@'):
+        try:
+            target_user = User.objects.get(username=args[1:])
+        except User.DoesNotExist:
+            await message.answer("Пользователь не найден.")
+            return
+    elif args.isdigit():
+        try:
+            target_user = User.objects.get(id=int(args))
+        except User.DoesNotExist:
+            await message.answer("Пользователь не найден.")
+            return
+    else:
+        await message.answer("Укажите пользователя: /public_events @username или /public_events user_id")
+        return
+
+    events = Event.objects.filter(user=target_user, is_public=True)
+    if events.exists():
+        text = f"Публичные события пользователя {target_user.username}:\n"
+        for event in events:
+            text += (
+                f"\n— {event.name}, {event.date.strftime('%d.%m.%Y')} в {event.time.strftime('%H:%M')}\n"
+                f"{event.details}\n"
+            )
+        await message.answer(text)
+    else:
+        await message.answer("Нет общедоступных событий у этого пользователя.")
 
 
 @sync_to_async
@@ -487,17 +584,41 @@ async def process_calendar_creation(message: types.Message):
         try:
             datetime.strptime(state["date"], "%Y-%m-%d")
             datetime.strptime(state["time"], "%H:%M")
+            # --- ВАЖНО: получаем ID СРАЗУ! ---
             event_id = await calendar.create_event(
                 user_id, state["name"], state["date"], state["time"], state["details"]
             )
+            if not event_id:
+                await message.answer("Ошибка: не удалось создать событие!", reply_markup=main_keyboard())
+            else:
+                # --- ТЕПЕРЬ ИЩЕМ ТОЛЬКО ПО ID ---
+                events = await calendar.get_all_events(user_id)
+                my_idx, my_event = None, None
+                for idx, event in enumerate(events, 1):
+                    # id тут может быть int или str
+                    if str(event.get("id", event.get("order"))) == str(event_id):
+                        my_idx = idx
+                        my_event = event
+                        break
+                if my_idx is None:
+                    await message.answer("Ошибка: не удалось найти только что созданное событие!")
+                else:
+                    ev = DummyEvent(
+                        id=str(my_event.get("id", my_event.get("order"))),
+                        name=str(my_event["name"]),
+                        details=str(my_event["details"]),
+                        date=datetime.strptime(str(my_event["date"]), '%Y-%m-%d'),
+                        time=datetime.strptime(str(my_event["time"]), '%H:%M:%S')
+                        if len(str(my_event["time"]).split(':')) == 3
+                        else datetime.strptime(str(my_event["time"]), '%H:%M'),
+                        is_public=bool(my_event.get("is_public", False))
+                    )
+                    text, keyboard = render_event_message(ev)
+                    await message.answer(text, reply_markup=keyboard)
+                    await offer_invite_after_event(message, my_idx)
+        except Exception as e:
             await message.answer(
-                f"Событие '{state['name']}' добавлено в календарь!\nID: {event_id}",
-                reply_markup=get_invite_keyboard(event_id)
-            )
-            await offer_invite_after_event(message, event_id)
-        except Exception:
-            await message.answer(
-                "Ошибка в данных события. Попробуйте создать событие заново.",
+                f"Ошибка в данных события. Попробуйте создать событие заново.\nDEBUG: {e}",
                 reply_markup=main_keyboard()
             )
         calendar_creation_state.pop(telegram_id, None)
@@ -505,7 +626,6 @@ async def process_calendar_creation(message: types.Message):
 
 @router.callback_query(lambda cq: cq.data.startswith("invite_event_"))
 async def invite_event_start_callback(callback_query: types.CallbackQuery):
-    # Открываем выбор пользователей по событию
     _, _, event_id = callback_query.data.split("_")
     telegram_id = callback_query.from_user.id
     keyboard = get_users_invite_keyboard(event_id, exclude_user_id=telegram_id)
@@ -583,6 +703,8 @@ async def calendar_create_handler(message: types.Message):
 
 
 async def calendar_list_handler(message: types.Message):
+    print("ПРОСТО ТЕСТ PRINT — ЭТО ДОЛЖНО БЫТЬ ВСЕГДА")
+    print("Я внутри calendar_list_handler!")
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
@@ -593,11 +715,24 @@ async def calendar_list_handler(message: types.Message):
         return
 
     events = await get_user_events_with_index(user_id)
+    print("EVENTS:", events, type(events))
+
     if not events:
         await message.answer("Событий пока нет.", reply_markup=main_keyboard())
         return
-    lines = [f"{e['order']}: {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events]
-    await message.answer("Список событий:\n" + "\n".join(lines))
+    for e in events:
+        ev = DummyEvent(
+            id=str(e.get("id", e.get("order"))),
+            name=str(e["name"]),
+            details=str(e["details"]),
+            date=datetime.strptime(str(e["date"]), '%Y-%m-%d'),
+            time=datetime.strptime(str(e["time"]), '%H:%M:%S') \
+                if len(str(e["time"]).split(':')) == 3 \
+                else datetime.strptime(str(e["time"]), '%H:%M'),
+            is_public=bool(e.get("is_public", False))
+        )
+        text, buttons = render_event_message(ev)
+        await message.answer(text, reply_markup=buttons)
 
 
 async def calendar_show_handler(message: types.Message):
@@ -643,13 +778,18 @@ async def calendar_edit_handler(message: types.Message):
     args = message.text.strip().split(maxsplit=5)
     if len(args) < 6:
         await message.answer(
-            "Используй: /calendar_edit <id> <название> <дата> <время> <описание>",
+            "Используй: /calendar_edit <номер> <название> <дата> <время> <описание>",
             reply_markup=main_keyboard()
         )
         return
     try:
-        _, event_id, name, date, time, details = args
-        event_id = int(event_id)
+        _, event_number, name, date, time, details = args
+        number = int(event_number)
+        events = await get_user_events_with_index(user_id)
+        if not (1 <= number <= len(events)):
+            await message.answer("Некорректный номер события.", reply_markup=main_keyboard())
+            return
+        event_id = str(events[number - 1]["id"])
         result = await calendar.edit_event(user_id, event_id, name, date, time, details)
         if result:
             await message.answer("Событие обновлено.", reply_markup=main_keyboard())
@@ -674,13 +814,13 @@ async def calendar_delete_handler(message: types.Message):
         await message.answer("Используй: /calendar_delete <номер>", reply_markup=main_keyboard())
         return
     try:
-        # Получаем все события пользователя с их номерами
+        # Получаем список событий с нужной сортировкой и индексами
         events = await get_user_events_with_index(user_id)
         num = int(args[1])
         if not (1 <= num <= len(events)):
             await message.answer("Некорректный номер. Попробуйте снова.", reply_markup=main_keyboard())
             return
-        event_id = events[num - 1]["id"]
+        event_id = str(events[num - 1]["id"])  # <-- вот тут как нужно!
         result = await calendar.delete_event(user_id, event_id)
         if result:
             await message.answer("Событие удалено.", reply_markup=main_keyboard())
@@ -696,62 +836,50 @@ calendar_delete_state = {}
 async def button_delete_calendar_event(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
+    events = await get_user_events_with_index(user_id)
     if not user_id:
         await message.answer(
             "Вы не зарегистрированы. Используйте /register",
             reply_markup=main_keyboard()
         )
         return
-
-    events = await get_user_events_with_index(user_id)
     if not events:
         await message.answer("У вас нет событий для удаления.", reply_markup=main_keyboard())
         return
-
-    lines = [f"{e['order']}: {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events]
-    calendar_delete_state[telegram_id] = events  # сохраняем события пользователя
-    await message.answer(
-        "Введите номер события, которое хотите удалить:\n" + "\n".join(lines),
-        reply_markup=types.ReplyKeyboardRemove()
-    )
+    await message.answer(f"DEBUG: events={events}")
+    calendar_delete_state[telegram_id] = events
+    await message.answer(f"DEBUG: events={events}")
+    text = "\n".join(f"{i + 1}. {e['name']} {e['date']} {e['time']}" for i, e in enumerate(events))
+    await message.answer("Ваши события:\n" + text + "\n\nОтправьте номер события для удаления.")
 
 
 async def process_calendar_deletion(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
+    events = calendar_delete_state.get(telegram_id)
     if not user_id or telegram_id not in calendar_delete_state:
         await message.answer(
             "Вы не зарегистрированы. Используйте /register",
             reply_markup=main_keyboard()
         )
         return
-
-    events = calendar_delete_state.get(telegram_id)
+    if not events:
+        await message.answer("Нет доступных событий.")
+        return
     try:
         num = int(message.text.strip())
-        await message.answer(f"DEBUG: num={num}, len={len(events)}; events orders: {[e['order'] for e in events]}")
         if not (1 <= num <= len(events)):
             raise ValueError
-        event_id = events[num - 1]["id"]
-        await message.answer(
-            f"DEBUG: Telegram ID: {telegram_id}, User DB ID: {user_id}, "
-            f"Удаляем event_id={event_id}, num={num}, всего событий={len(events)}"
-        )
+        event_item = events[num - 1]
+        event_id = event_item["id"] if isinstance(event_item, dict) else event_item.id
         result = await calendar.delete_event(user_id, event_id)
         if result:
             await message.answer("Событие удалено.", reply_markup=main_keyboard())
-            calendar_delete_state.pop(telegram_id, None)
         else:
             await message.answer("Событие не найдено.", reply_markup=main_keyboard())
-            calendar_delete_state.pop(telegram_id, None)
-    except Exception:
-        lines = [
-            f"{e['order']}: {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events
-        ]
-        await message.answer(
-            "Некорректный номер. Попробуйте снова.\n\n"
-            + "\n".join(lines)
-        )
+        calendar_delete_state.pop(telegram_id, None)
+    except Exception as e:
+        await message.answer(f"Некорректный номер.\nDEBUG: exception={e}")
 
 
 calendar_edit_state = {}
