@@ -7,12 +7,13 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "TelegramBot_Calendar.settings")
 django.setup()
 
 from bot.loader import bot, dp
-from bot.handlers import router, register_handlers
+from bot.handlers import register_handlers
 
 logging.basicConfig(level=logging.INFO)
 
-dp.include_router(router)
+print("=== Регистрируем handler-ы ===")
 register_handlers(dp)
+print("=== Запуск polling ===")
 
 
 async def main():

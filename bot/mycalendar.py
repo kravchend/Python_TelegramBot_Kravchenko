@@ -144,7 +144,6 @@ class Calendar:
 
     async def delete_event(self, user_id, event_id):
         result = await sync_to_async(Calendar._delete_event_sync)(user_id, event_id)
-        print('delete_event result:', result)
         if result:
             await self._increment_stat('cancelled_events')
         return result

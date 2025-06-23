@@ -5,7 +5,8 @@ from .models import User, Event, Appointment, BotStatistics
 from django.db.models import Q
 from datetime import datetime
 from .forms import EventForm
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
+import csv
 
 
 def home(request):
@@ -59,17 +60,6 @@ def event_delete(request, pk):
 
 
 @login_required
-def profile(request):
-    user = get_object_or_404(User, username=request.user.username)
-    stats = {
-        'created': user.events_created,
-        'edited': user.events_edited,
-        'cancelled': user.events_cancelled,
-    }
-    return render(request, 'pages/profile.html', {'user': user, 'stats': stats})
-
-
-@login_required
 def calendar_view(request):
     user = get_object_or_404(User, username=request.user.username)
     now = datetime.now()
@@ -109,16 +99,46 @@ def statistics_view(request):
 
 
 @login_required
-def profile_view(request):
-    user = get_object_or_404(User, telegram_id=request.user.telegram_id)
+def profile(request):
+    user = None
+    if hasattr(request.user, 'telegram_id') and request.user.telegram_id:
+        user = get_object_or_404(User, telegram_id=request.user.telegram_id)
+    else:
+        user = get_object_or_404(User, username=request.user.username)
 
     stats = {
         'created': user.events_created,
         'edited': user.events_edited,
         'cancelled': user.events_cancelled,
     }
+    return render(request, 'pages/profile.html', {'user': user, 'stats': stats})
 
-    return render(request, 'pages/profile.html', {
-        'user': user,
-        'stats': stats
-    })
+
+@login_required
+def export_events_json(request):
+    user = request.user
+    events = Event.objects.filter(user=user)
+    data = [
+        {
+            'name': event.name,
+            'date': event.date,
+            'time': str(event.time),
+            'details': event.details,
+            'is_public': event.is_public
+        }
+        for event in events
+    ]
+    return JsonResponse({'events': data})
+
+
+@login_required
+def export_events_csv(request):
+    user = request.user
+    events = Event.objects.filter(user=user)
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="events_{user.username or user.id}.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['name', 'date', 'time', 'details', 'is_public'])
+    for event in events:
+        writer.writerow([event.name, event.date, event.time, event.details, event.is_public])
+    return response

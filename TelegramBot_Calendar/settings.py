@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'calendarapp',
+    'rest_framework',
 ]
 
 AUTH_USER_MODEL = 'calendarapp.User'
