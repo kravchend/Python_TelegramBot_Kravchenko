@@ -1,13 +1,13 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import types
-from calendarapp.models import User
+from calendarapp.models import User, Appointment
 from asgiref.sync import sync_to_async
 
 
 def main_keyboard():
     keyboard = [
         [
-            types.KeyboardButton(text="📆 Календарь")
+            types.KeyboardButton(text="📆 Календарь"),
         ],
 
         [
@@ -37,29 +37,37 @@ def get_invite_keyboard(event_id):
 def get_users_invite_keyboard(event_id, users):
     inline_keyboard = []
     for i in range(0, len(users), 2):
-        row = [
-            InlineKeyboardButton(
-                text=users[i].username or f"ID {users[i].telegram_id}",
-                callback_data=f"invite_{event_id}_{users[i].telegram_id}",
-            )
-        ]
-        if i + 1 < len(users):
-            row.append(
-                InlineKeyboardButton(
-                    text=users[i + 1].username or f"ID {users[i + 1].telegram_id}",
-                    callback_data=f"invite_{event_id}_{users[i + 1].telegram_id}",
+        row = []
+        for j in range(2):
+            if i + j < len(users):
+                user = users[i + j]
+                label = user.username if user.username else f"ID {user.telegram_id}"
+                row.append(
+                    InlineKeyboardButton(
+                        text=label,
+                        callback_data=f"invite_{event_id}_{user.telegram_id}",
+                    )
                 )
-            )
         inline_keyboard.append(row)
     inline_keyboard.append([InlineKeyboardButton(text="Готово", callback_data="invite_done")])
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-async def get_invitable_users(exclude_user_id):
-    return list(await sync_to_async(
-        lambda: list(User.objects.exclude(telegram_id=exclude_user_id))
-    )())
+async def get_invitable_users(event_id, exclude_user_id):
+    def query():
+        already_invited = Appointment.objects.filter(
+            event_id=event_id,
+            status__in=["pending", "confirmed"]
+        ).values_list("invitee__telegram_id", flat=True)
+
+        return User.objects.filter(telegram_id__isnull=False).exclude(
+            telegram_id=exclude_user_id
+        ).exclude(
+            telegram_id__in=already_invited
+        )
+
+    return list(await sync_to_async(lambda: list(query()))())
 
 
 def event_public_action_keyboard(event_id, is_public):

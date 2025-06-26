@@ -170,7 +170,7 @@ async def button_create_calendar_event(message: types.Message):
 @router.callback_query(lambda cq: cq.data.startswith("invite_event_"))
 async def invite_event_start_callback(callback: types.CallbackQuery):
     event_id = int(callback.data.rsplit("_", 1)[-1])
-    users = await get_invitable_users(exclude_user_id=callback.from_user.id)  # Получаем список пользователей
+    users = await get_invitable_users(event_id=event_id, exclude_user_id=callback.from_user.id)
     keyboard = get_users_invite_keyboard(event_id, users)
     await callback.message.edit_text(
         "Кого пригласить на это событие?\nВыберите пользователя:",
@@ -335,7 +335,7 @@ async def user_calendar_handler(message: types.Message):
 async def show_calendar_month(message: types.Message, bot: Bot):
     html_calendar, year, month = calendar.render_for_template()
     txt = f"Календарь за {month:02}.{year}:\n\n"
-    await message.answer(txt + "(Открыть общий календарь на сайте: https://your-domain/calendar/)")
+    await message.answer(txt + "(Открыть общий календарь на сайте: http://127.0.0.1:8000/calendar/)")
 
 
 @router.message(Command("invite"))

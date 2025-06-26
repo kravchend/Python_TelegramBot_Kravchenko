@@ -49,14 +49,20 @@ class Calendar:
 
     async def register_user(self, telegram_id, username=None):
         try:
+            if not username:
+                username = f"user_{telegram_id}"
             user, created = await sync_to_async(User.objects.get_or_create)(
                 telegram_id=telegram_id,
                 defaults={'username': username}
             )
             if created:
+                logger.info(f"User {telegram_id} зарегистрирован")
                 await self._increment_stat('user_count')
+            else:
+                logger.info(f"User {telegram_id} уже зарегистрирован")
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"Ошибка регистрации пользователя {telegram_id}: {e}")
             return False
 
     async def is_registered(self, telegram_id):
@@ -65,8 +71,10 @@ class Calendar:
     async def get_user_db_id(self, telegram_id):
         try:
             user = await sync_to_async(User.objects.get)(telegram_id=telegram_id)
+            logger.info(f"User found: {user}")
             return user.id
         except User.DoesNotExist:
+            logger.warning(f"User {telegram_id} не найден")
             return None
 
     async def create_event(self, user_id, event_name, event_date, event_time, event_details):
@@ -171,17 +179,39 @@ class Calendar:
         return await sync_to_async(lambda: list(q.values('date', 'time', 'status', 'event_id')))()
 
     async def invite_user_to_event(self, organizer, invitee, event, date, time, details=""):
+        # Приведение date к datetime.date, а time к datetime.time если они вдруг строковые
+        if isinstance(date, str):
+            try:
+                date = datetime.strptime(date, "%Y-%m-%d").date()
+            except Exception as e:
+                print(f"Ошибка парсинга даты: {e}")
+        if isinstance(time, str):
+            try:
+                # Поддержка как HH:MM, так и HH:MM:SS
+                try:
+                    time = datetime.strptime(time, "%H:%M").time()
+                except ValueError:
+                    time = datetime.strptime(time, "%H:%M:%S").time()
+            except Exception as e:
+                print(f"Ошибка парсинга времени: {e}")
+
+        print(
+            f"DEBUG-invite: organizer={organizer}, invitee={invitee}, event={event}, date={date} ({type(date)}), time={time} ({type(time)}), details={details}")
+
         appointment, created = await sync_to_async(Appointment.objects.get_or_create)(
             organizer=organizer,
             invitee=invitee,
             event=event,
+            date=date,
+            time=time,
             defaults={
-                "date": event.date,
-                "time": event.time,
-                "details": event.details,
+                "details": details if details else getattr(event, 'details', ''),
                 "status": "pending"
             }
         )
+        print(
+            f"DEBUG-invite-res: appointment={appointment}, created={created}, status={getattr(appointment, 'status', None)}")
+        # Блок возвращения None если уже есть ожидающая или подтверждённая встреча
         if not created and appointment.status in ["pending", "confirmed"]:
             return None
         elif not created:
