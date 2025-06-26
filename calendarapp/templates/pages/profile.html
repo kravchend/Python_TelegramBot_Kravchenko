@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Профиль — CalendarApp{% endblock %}
+
+{% block content %}
+    <h2>Профиль пользователя</h2>
+    <table>
+        <tr>
+            <th>Telegram ID</th>
+            <td>{{ user.telegram_id }}</td>
+        </tr>
+        <tr>
+            <th>Username</th>
+            <td>
+                {% if user.username %}
+                    @{{ user.username }}
+                {% else %}
+                    <span style="color: #bbb;">—</span>
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Email</th>
+            <td>
+                {% if user.email %}
+                    {{ user.email }}
+                {% else %}
+                    <span style="color: #bbb;">—</span>
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Зарегистрирован</th>
+            <td>{{ user.registered_at|date:"d.m.Y H:i" }}</td>
+        </tr>
+    </table>
+
+    <h3>Ваша статистика</h3>
+    <table>
+        <tr>
+            <th>Создано событий</th>
+            <td>{{ stats.created }}</td>
+        </tr>
+        <tr>
+            <th>Отредактировано событий</th>
+            <td>{{ stats.edited }}</td>
+        </tr>
+        <tr>
+            <th>Отменено событий</th>
+            <td>{{ stats.cancelled }}</td>
+        </tr>
+    </table>
+{% endblock %}

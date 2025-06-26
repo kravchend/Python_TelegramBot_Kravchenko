@@ -6,18 +6,10 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "TelegramBot_Calendar.settings")
 django.setup()
 
-from aiogram import Bot, Dispatcher
-from dotenv import load_dotenv
-
+from bot.loader import bot, dp
 from bot.handlers import register_handlers
 
-load_dotenv()
-API_TOKEN = os.getenv("BOT_TOKEN")
-
 logging.basicConfig(level=logging.INFO)
-
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
 
 register_handlers(dp)
 

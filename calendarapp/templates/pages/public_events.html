@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Публичные события — CalendarApp{% endblock %}
+
+{% block content %}
+    <h2>Публичные события</h2>
+    {% if events %}
+        <table>
+            <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Организатор</th>
+                <th>Название</th>
+                <th>Детали</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for event in events %}
+                <tr>
+                    <td>{{ event.date }}</td>
+                    <td>{{ event.time|default:"—" }}</td>
+                    <td>
+                        {% if event.user.username %}@{{ event.user.username }}{% else %}—{% endif %}
+                    </td>
+                    <td>{{ event.name }}</td>
+                    <td>{{ event.details|default:"—" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-msg">Публичных событий пока нет.</div>
+    {% endif %}
+{% endblock %}

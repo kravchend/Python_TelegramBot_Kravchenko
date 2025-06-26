@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Главная — CalendarApp{% endblock %}
+
+{% block content %}
+    <h2>Добро пожаловать в CalendarApp!</h2>
+    {% if user.is_authenticated %}
+        <p>Вы вошли как <strong>@{{ user.username }}</strong></p>
+        <p>Посмотрите ваш <a href="{% url 'calendar' %}">личный календарь</a>, <a href="{% url 'user_appointments' %}">встречи</a>
+            или <a href="{% url 'profile' %}">профиль</a>.</p>
+    {% else %}
+        <p>Пожалуйста, <a href="{% url 'login' %}">войдите</a>, чтобы управлять событиями.<br>Или познакомьтесь с <a
+                href="{% url 'public_events' %}">публичными событиями</a>.</p>
+    {% endif %}
+
+    <h3>О платформе</h3>
+    <ul>
+        <li>Создавайте личные и публичные события</li>
+        <li>Планируйте встречи с другими пользователями</li>
+        <li>Всё синхронизируется с Telegram-ботом</li>
+    </ul>
+{% endblock %}
