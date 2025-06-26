@@ -1,0 +1,17 @@
+FROM python:3.12-slim
+
+# Установка рабочей директории
+WORKDIR /app
+
+# Копируем файлы зависимостей и устанавливаем их
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Копируем весь проект внутрь контейнера
+COPY . .
+
+# Открываем порт 8000
+EXPOSE 8000
+
+# Команда по умолчанию: запуск Django-сервера
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

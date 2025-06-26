@@ -1,0 +1,53 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      DJANGO_DB_HOST: db
+      DJANGO_DB_PORT: ${DATABASE_PORT}
+      DJANGO_DB_NAME: ${DATABASE_NAME}
+      DJANGO_DB_USER: ${DATABASE_USER}
+      DJANGO_DB_PASSWORD: ${DATABASE_PASSWORD}
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    command: python -m bot.bot
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      BOT_DB_HOST: db
+      BOT_DB_PORT: ${DATABASE_PORT}
+      BOT_DB_NAME: ${DATABASE_NAME}
+      BOT_DB_USER: ${DATABASE_USER}
+      BOT_DB_PASSWORD: ${DATABASE_PASSWORD}
+
+volumes:
+  db-data:
