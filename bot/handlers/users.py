@@ -19,11 +19,9 @@ async def send_welcome(message: types.Message):
 
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
-
         await calendar.register_user(telegram_id, username)
         await message.answer("Вы были зарегистрированы!", reply_markup=main_keyboard())
 
-    # Просто приветствие
     await message.answer(
         f"Привет, {full_name}! Я бот-календарь.",
         reply_markup=main_keyboard()

@@ -7,7 +7,6 @@ from asgiref.sync import sync_to_async
 from bot.calendar_instance import calendar
 from calendarapp.models import User, Event, Appointment
 from bot.handlers.users import get_bot
-import traceback
 
 router = Router()
 
@@ -106,7 +105,6 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
         return
 
     parts = data.split("_")
-    print(f"DEBUG: Parsed parts={parts}")
 
     if len(parts) != 3:
         await callback_query.answer("Некорректный формат кнопки!", show_alert=True)
@@ -118,17 +116,9 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
         invitee_tg_id = int(invitee_tg_id)
         organizer_tg_id = callback_query.from_user.id
 
-        print(f"DEBUG: Получаем Event id={event_id}")
         event = await sync_to_async(Event.objects.get)(id=event_id)
-        print(f"DEBUG: Event найден: {event}")
-
         organizer = await sync_to_async(User.objects.get)(telegram_id=organizer_tg_id)
-        print(f"DEBUG: Organizer найден: {organizer}")
-
         invitee = await sync_to_async(User.objects.get)(telegram_id=invitee_tg_id)
-        print(f"DEBUG: Invitee найден: {invitee}")
-
-        # Не даём приглашать повторно, если ещё актуален приглас
         exist = await sync_to_async(Appointment.objects.filter)(
             event=event,
             invitee=invitee,
@@ -164,13 +154,10 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
         )
     except Exception as e:
         await callback_query.answer(f"Ошибка: {e}", show_alert=True)
-        print("EXCEPTION:", e)
-        print(traceback.format_exc())
 
 
 @router.callback_query(lambda cq: cq.data.startswith("appt_confirm_") or cq.data.startswith("appt_cancel_"))
 async def appointment_action_callback(callback: types.CallbackQuery):
-    print("ACTION_CALLBACK:", callback.data)
     bot = await get_bot()
     data = callback.data
 
@@ -260,7 +247,6 @@ async def command_invite_user(message: types.Message):
     _, invitee_telegram_id, event_id, date, time = args
     organizer_telegram_id = message.from_user.id
 
-    # Получаем пользователей
     organizer = await calendar.get_user_db_id(organizer_telegram_id)
     invitee = await calendar.get_user_db_id(int(invitee_telegram_id))
     event = await sync_to_async(Event.objects.get)(id=int(event_id))

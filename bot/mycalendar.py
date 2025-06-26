@@ -179,7 +179,6 @@ class Calendar:
         return await sync_to_async(lambda: list(q.values('date', 'time', 'status', 'event_id')))()
 
     async def invite_user_to_event(self, organizer, invitee, event, date, time, details=""):
-        # Приведение date к datetime.date, а time к datetime.time если они вдруг строковые
         if isinstance(date, str):
             try:
                 date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -187,7 +186,6 @@ class Calendar:
                 print(f"Ошибка парсинга даты: {e}")
         if isinstance(time, str):
             try:
-                # Поддержка как HH:MM, так и HH:MM:SS
                 try:
                     time = datetime.strptime(time, "%H:%M").time()
                 except ValueError:

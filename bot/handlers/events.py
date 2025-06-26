@@ -278,11 +278,6 @@ async def export_events_command(message: types.Message):
     await send_export_links(message)
 
 
-@router.message(Command(commands=["выгрузить", "export"]))
-async def export_events_command(message: types.Message):
-    await send_export_links(message)
-
-
 @router.callback_query(lambda c: c.data.startswith("edit_event_"))
 async def start_edit_event_callback(callback: types.CallbackQuery):
     telegram_id = callback.from_user.id
@@ -332,7 +327,7 @@ async def user_calendar_handler(message: types.Message):
 
 
 @router.message(F.text == "📆 Календарь")
-async def show_calendar_month(message: types.Message, bot: Bot):
+async def show_calendar_month(message: types.Message):
     html_calendar, year, month = calendar.render_for_template()
     txt = f"Календарь за {month:02}.{year}:\n\n"
     await message.answer(txt + "(Открыть общий календарь на сайте: http://127.0.0.1:8000/calendar/)")

@@ -11,9 +11,7 @@ from bot.handlers import register_handlers
 
 logging.basicConfig(level=logging.INFO)
 
-print("=== Регистрируем handler-ы ===")
 register_handlers(dp)
-print("=== Запуск polling ===")
 
 
 async def main():
