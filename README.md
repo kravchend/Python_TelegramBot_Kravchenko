@@ -77,7 +77,7 @@
     ```
 5. Запустите бота:
     ```bash
-    python bot/main.py
+    PYTHONPATH=. python -m bot.bot
     ```
 
 ---
