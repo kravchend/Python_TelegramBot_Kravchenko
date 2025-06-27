@@ -25,7 +25,7 @@ urlpatterns = [
     path('', include('calendarapp.urls')),
     path('accounts/', include('django.contrib.auth.urls')),
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
-
+    path('api/', include('calendarapp.api_urls')),
 ]
 
 if settings.DEBUG:

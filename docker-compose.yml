@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   db:
     image: postgres:15
@@ -19,7 +17,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
-    command: python manage.py runserver 0.0.0.0:8000
+    command: >
+      sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+
     ports:
       - "8000:8000"
     depends_on:
@@ -32,6 +32,7 @@ services:
       DJANGO_DB_NAME: ${DATABASE_NAME}
       DJANGO_DB_USER: ${DATABASE_USER}
       DJANGO_DB_PASSWORD: ${DATABASE_PASSWORD}
+      PYTHONPATH: /app
 
   bot:
     build:
@@ -48,6 +49,7 @@ services:
       BOT_DB_NAME: ${DATABASE_NAME}
       BOT_DB_USER: ${DATABASE_USER}
       BOT_DB_PASSWORD: ${DATABASE_PASSWORD}
+      PYTHONPATH: /app
 
 volumes:
   db-data:
