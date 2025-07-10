@@ -4,9 +4,9 @@ from .views import profile, custom_logout
 
 urlpatterns = [
     path('', views.home, name='home'),
-    path('home/', views.home, name='home'),
+    path('home/', views.home, name='home'),  # Продублированный, можно удалить
+    path('logout/', views.custom_logout, name='logout'),  # Маршрут выхода
     path('calendar/', views.calendar_view, name='calendar'),
-    path('logout/', custom_logout, name='logout'),
     path('register/', views.site_register_view, name='site_register'),
     path('appointments/<int:pk>/update-status/', views.update_appointment_status, name='update_appointment_status'),
     path('profile/', views.profile, name='profile'),
@@ -23,6 +23,6 @@ urlpatterns = [
     path('export/json/', views.export_events_json, name='export_events_json'),
     path('export/csv/', views.export_events_csv, name='export_events_csv'),
     path('api/', include('calendarapp.api_urls')),
-
 ]
+
 

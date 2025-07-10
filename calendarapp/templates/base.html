@@ -101,8 +101,7 @@
 <body>
 <header>
     <h1>CalendarApp</h1>
-    <div style="font-size: 1.05em;">Управляйте своими событиями и встречами через Telegram-бота и этот веб-интерфейс
-    </div>
+    <div style="font-size: 1.05em;">Управляйте своими событиями и встречами через Telegram-бота и этот веб-интерфейс</div>
 </header>
 <nav>
        <a href="{% url 'home' %}">Главная</a>
@@ -111,7 +110,7 @@
            <a href="{% url 'event_list' %}">Мои события</a>
            <a href="{% url 'profile' %}">Профиль</a>
            <a href="{% url 'user_appointments' %}">Мои встречи</a>
-           <a href="{% url 'logout' %}">Выйти</a> <!-- Убедитесь, что ссылка на ваш кастомный путь -->
+           <a href="{% url 'logout' %}">Выйти</a>
        {% else %}
            <a href="{% url 'login' %}">Войти</a>
            <a href="{% url 'site_register' %}">Регистрация</a>

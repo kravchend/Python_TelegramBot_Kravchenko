@@ -111,8 +111,20 @@
             <tr>
                 <td>{{ appt.date }}</td>
                 <td>{{ appt.time|default:"—" }}</td>
-                <td><span class="user-tag">@{{ appt.organizer.username }}</span></td>
-                <td><span class="user-tag">@{{ appt.invitee.username }}</span></td>
+                <td>
+                    {% if appt.organizer %}
+                        <span class="user-tag">@{{ appt.organizer.username }}</span>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if appt.invitee %}
+                        <span class="user-tag">@{{ appt.invitee.username }}</span>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
                 <td>
                     {% if appt.event %}
                         <a href="{% url 'event_detail' appt.event.id %}" class="event-link">{{ appt.event.name }}</a>
@@ -133,14 +145,19 @@
                     {% endif %}
                 </td>
                 <td class="actions">
-                    {% if appt.status == 'pending' %}
+                    {% if appt.status == 'pending' and appt.invitee == user %}
+                        <!-- Кнопки действия -->
                         <form method="POST" action="{% url 'update_appointment_status' appt.id %}">
                             {% csrf_token %}
-                            <button type="submit" name="action" value="confirm" class="btn btn-confirm">Принять</button>
+                            <button type="submit" name="action" value="confirm" class="btn btn-confirm">
+                                Принять
+                            </button>
                         </form>
                         <form method="POST" action="{% url 'update_appointment_status' appt.id %}">
                             {% csrf_token %}
-                            <button type="submit" name="action" value="cancel" class="btn btn-cancel">Отклонить</button>
+                            <button type="submit" name="action" value="cancel" class="btn btn-cancel">
+                                Отклонить
+                            </button>
                         </form>
                     {% else %}
                         <span>—</span>

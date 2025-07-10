@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from bot.calendar_instance import calendar
 from django.contrib.auth.decorators import login_required
+from bot.handlers.keyboards import appointment_action_keyboard
 from .models import User, Event, Appointment, BotStatistics
 from django.db.models import Q
 from datetime import datetime
@@ -9,6 +10,9 @@ from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
 import csv
 from django.contrib.auth import login, logout
 from django.views.decorators.http import require_POST
+from asgiref.sync import async_to_sync
+from bot.handlers.users import get_bot
+from django.contrib import messages
 
 
 def home(request):
@@ -17,6 +21,7 @@ def home(request):
 
 def custom_logout(request):
     logout(request)
+    messages.info(request, "Вы успешно вышли из системы. Пожалуйста, войдите или зарегистрируйтесь.")
     return redirect('home')
 
 
@@ -36,18 +41,31 @@ def site_register_view(request):
 
 @login_required
 @require_POST
-def update_appointment_status(request, pk):
+async def update_appointment_status(request, pk):
     appointment = get_object_or_404(Appointment, pk=pk, invitee=request.user)
     action = request.POST.get('action')
 
     if action == 'confirm':
         appointment.status = 'confirmed'
+        message_to_invitee = "Вы подтвердили встречу."
+        message_to_organizer = f"{appointment.invitee.username} подтвердил участие в событии '{appointment.event.name}'."
     elif action == 'cancel':
         appointment.status = 'cancelled'
+        message_to_invitee = "Вы отклонили встречу."
+        message_to_organizer = f"{appointment.invitee.username} отклонил приглашение на событие '{appointment.event.name}'."
     else:
         return HttpResponseForbidden("Некорректное действие.")
 
     appointment.save()
+
+    if appointment.organizer.telegram_id:
+        try:
+            bot = await get_bot()
+            await bot.send_message(chat_id=appointment.organizer.telegram_id, text=message_to_organizer)
+        except Exception as e:
+            print(f"Ошибка отправки уведомления организатору: {e}")
+
+    messages.success(request, message_to_invitee)
     return redirect('user_appointments')
 
 
@@ -233,12 +251,13 @@ def event_detail(request, pk):
     })
 
 
-
 @login_required
 def invite_users_to_event(request, pk):
     event = get_object_or_404(Event, pk=pk, user=request.user)
 
-    users = User.objects.exclude(id=request.user.id)
+    users = User.objects.exclude(id=request.user.id).exclude(
+        id__in=Appointment.objects.filter(event=event).values_list('invitee_id', flat=True)
+    )
 
     if request.method == "POST":
         selected_user_ids = request.POST.getlist("user_ids")
@@ -246,7 +265,7 @@ def invite_users_to_event(request, pk):
         for user_id in selected_user_ids:
             try:
                 invitee = User.objects.get(id=user_id)
-                Appointment.objects.get_or_create(
+                appointment, created = Appointment.objects.get_or_create(
                     organizer=request.user,
                     invitee=invitee,
                     event=event,
@@ -254,6 +273,8 @@ def invite_users_to_event(request, pk):
                     time=event.time,
                     defaults={'status': 'pending'}
                 )
+                if created:
+                    async_to_sync(send_invitation_to_telegram)(invitee, event, appointment)
             except User.DoesNotExist:
                 continue
 
@@ -261,5 +282,18 @@ def invite_users_to_event(request, pk):
 
     return render(request, "pages/invite_users.html", {
         "event": event,
-        "users": users
+        "users": users,
     })
+
+
+async def send_invitation_to_telegram(invitee, event, appointment):
+    if invitee.telegram_id:
+        try:
+            bot = await get_bot()
+            await bot.send_message(
+                invitee.telegram_id,
+                f"Вас пригласили на событие '{event.name}' {event.date} в {event.time}.",
+                reply_markup=appointment_action_keyboard(appointment.id)
+            )
+        except Exception as e:
+            print(f"Ошибка при отправке уведомления: {e}")
