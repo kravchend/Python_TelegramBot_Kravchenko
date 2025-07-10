@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Детали события — CalendarApp{% endblock %}
+
+{% block content %}
+    <h2>Детали события</h2>
+
+    <table style="margin-top: 15px; width: 100%; border-collapse: collapse;">
+        <tr>
+            <th style="text-align: left; width: 30%; padding-right: 20px;">Название</th>
+            <td>{{ event.name }}</td>
+        </tr>
+        <tr>
+            <th style="text-align: left; width: 30%; padding-right: 20px;">Дата</th>
+            <td>{{ event.date }}</td>
+        </tr>
+        <tr>
+            <th style="text-align: left; width: 30%; padding-right: 20px;">Время</th>
+            <td>{{ event.time|default:"—" }}</td>
+        </tr>
+        <tr>
+            <th style="text-align: left; width: 30%; padding-right: 20px;">Детали</th>
+            <td>{{ event.details|default:"Нет деталей" }}</td>
+        </tr>
+        <tr>
+            <th style="text-align: left; width: 30%; padding-right: 20px;">Тип события</th>
+            <td>{% if event.is_public %}Публичное{% else %}Личное{% endif %}</td>
+        </tr>
+    </table>
+
+    <div style="margin-top: 20px;">
+        <!-- Кнопки управления событием -->
+        <a href="{% url 'event_edit' event.id %}" class="btn btn-primary">Редактировать</a>
+        <form method="post" action="{% url 'event_delete' event.id %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Удалить</button>
+        </form>
+        <a href="{% url 'event_list' %}" class="btn btn-secondary">Назад к списку</a>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <h3>Пригласить пользователей</h3>
+
+        <form method="post" action="{% url 'invite_users' event.id %}">
+            {% csrf_token %}
+            <table class="table" style="width: 100%; margin-top: 15px; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">Выбор</th>
+                        <th style="text-align: left;">Имя пользователя</th>
+                        <th style="text-align: left;">Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in invitable_users %}
+                        <tr>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="user_ids" value="{{ user.id }}">
+                                </label>
+                            </td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email|default:"—" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3">Нет доступных пользователей для приглашения.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="submit" class="btn btn-success">Отправить приглашения</button>
+        </form>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <h3>Приглашённые пользователи</h3>
+
+        <table class="table" style="width: 100%; margin-top: 15px; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left;">Имя пользователя</th>
+                    <th style="text-align: left;">Email</th>
+                    <th style="text-align: left;">Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for appointment in invited_users %}
+                    <tr>
+                        <td>{{ appointment.invitee.username }}</td>
+                        <td>{{ appointment.invitee.email|default:"—" }}</td>
+                        <td>{{ appointment.get_status_display }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3">Нет приглашённых пользователей.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+import random
 
 
 class User(AbstractUser):
@@ -15,7 +16,12 @@ class User(AbstractUser):
         verbose_name_plural = 'Пользователи'
 
     def __str__(self):
-        return f"{self.telegram_id}"
+        return f"{self.telegram_id or self.username}"
+
+    def save(self, *args, **kwargs):
+        if not self.telegram_id:
+            self.telegram_id = random.randint(1, 9223372036854775807)
+        super().save(*args, **kwargs)
 
 
 class Event(models.Model):

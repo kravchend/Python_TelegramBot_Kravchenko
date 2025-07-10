@@ -1,52 +1,59 @@
 {% extends "base.html" %}
-{% block title %}Профиль — CalendarApp{% endblock %}
+{% block title %}Профиль пользователя{% endblock %}
 
 {% block content %}
-    <h2>Профиль пользователя</h2>
-    <table>
-        <tr>
-            <th>Telegram ID</th>
-            <td>{{ user.telegram_id }}</td>
-        </tr>
-        <tr>
-            <th>Username</th>
-            <td>
-                {% if user.username %}
-                    @{{ user.username }}
-                {% else %}
-                    <span style="color: #bbb;">—</span>
-                {% endif %}
-            </td>
-        </tr>
-        <tr>
-            <th>Email</th>
-            <td>
-                {% if user.email %}
-                    {{ user.email }}
-                {% else %}
-                    <span style="color: #bbb;">—</span>
-                {% endif %}
-            </td>
-        </tr>
-        <tr>
-            <th>Зарегистрирован</th>
-            <td>{{ user.registered_at|date:"d.m.Y H:i" }}</td>
-        </tr>
-    </table>
+<h2>Профиль пользователя: {{ user.username }}</h2>
+<p>Telegram ID: {{ user.telegram_id|default:"—" }}</p>
 
-    <h3>Ваша статистика</h3>
-    <table>
-        <tr>
-            <th>Создано событий</th>
-            <td>{{ stats.created }}</td>
-        </tr>
-        <tr>
-            <th>Отредактировано событий</th>
-            <td>{{ stats.edited }}</td>
-        </tr>
-        <tr>
-            <th>Отменено событий</th>
-            <td>{{ stats.cancelled }}</td>
-        </tr>
-    </table>
+<h3>Статистика:</h3>
+<ul>
+    <li>Создано событий: {{ stats.created }}</li>
+    <li>Отредактировано событий: {{ stats.edited }}</li>
+    <li>Отменено событий: {{ stats.cancelled }}</li>
+</ul>
+
+<h3>Созданные события:</h3>
+<ul>
+    {% for event in created_events %}
+        <li><a href="{% url 'event_detail' event.pk %}">{{ event.name }}</a> ({{ event.date }}, {{ event.time }})</li>
+    {% empty %}
+        <p>Нет созданных событий.</p>
+    {% endfor %}
+</ul>
+
+<h3>Приглашения от других пользователей:</h3>
+<ul>
+    {% for appointment in incoming_appointments %}
+        <li>
+            <strong>{{ appointment.event.name }}</strong>
+            от {{ appointment.organizer.username }},
+            Дата: {{ appointment.date }} {{ appointment.time }},
+            Статус: {{ appointment.get_status_display }}
+
+            {% if appointment.status == 'pending' %}
+            <form method="post" action="{% url 'update_appointment_status' appointment.pk %}">
+                {% csrf_token %}
+                <button name="action" value="confirm" class="btn btn-success btn-sm">Принять</button>
+                <button name="action" value="cancel" class="btn btn-danger btn-sm">Отклонить</button>
+            </form>
+            {% endif %}
+        </li>
+    {% empty %}
+        <p>Нет приглашений.</p>
+    {% endfor %}
+</ul>
+
+<h3>Отправленные приглашения:</h3>
+<ul>
+    {% for appointment in outgoing_appointments %}
+        <li>
+            <strong>{{ appointment.event.name }}</strong> для {{ appointment.invitee.username }},
+            Дата: {{ appointment.date }} {{ appointment.time }},
+            Статус: {{ appointment.get_status_display }}
+        </li>
+    {% empty %}
+        <p>Нет исходящих приглашений.</p>
+    {% endfor %}
+</ul>
+
 {% endblock %}

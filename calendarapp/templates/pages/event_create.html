@@ -3,7 +3,44 @@
     <h2>Создать событие</h2>
     <form method="post" novalidate>
         {% csrf_token %}
-        {{ form.as_p }}
+
+        <div class="mb-3">
+            <label for="id_name" class="form-label">Название</label>
+            {{ form.name }}
+            {% if form.name.errors %}
+                <div class="text-danger">{{ form.name.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_date" class="form-label">Дата</label>
+            {{ form.date }}
+            {% if form.date.errors %}
+                <div class="text-danger">{{ form.date.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_time" class="form-label">Время</label>
+            {{ form.time }}
+            {% if form.time.errors %}
+                <div class="text-danger">{{ form.time.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="id_details" class="form-label">Детали</label>
+            {{ form.details }}
+            {% if form.details.errors %}
+                <div class="text-danger">{{ form.details.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3 form-check">
+            <label for="id_is_public" class="form-check-label">Публичное событие</label>
+            {{ form.is_public }}
+        </div>
+
         <button type="submit" class="btn btn-success">Создать</button>
         <a href="{% url 'event_list' %}" class="btn btn-secondary">Отмена</a>
     </form>

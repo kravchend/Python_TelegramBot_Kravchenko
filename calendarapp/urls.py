@@ -1,16 +1,21 @@
 from django.urls import path, include
 from . import views
-from .views import profile
+from .views import profile, custom_logout
 
 urlpatterns = [
     path('', views.home, name='home'),
     path('home/', views.home, name='home'),
     path('calendar/', views.calendar_view, name='calendar'),
+    path('logout/', custom_logout, name='logout'),
+    path('register/', views.site_register_view, name='site_register'),
+    path('appointments/<int:pk>/update-status/', views.update_appointment_status, name='update_appointment_status'),
     path('profile/', views.profile, name='profile'),
+    path('event/<int:pk>/invite/', views.invite_users_to_event, name='invite_users'),
+    path('event/<int:pk>/', views.event_detail, name='event_detail'),
     path('appointments/', views.user_appointments, name='user_appointments'),
     path('public-events/', views.public_events, name='public_events'),
     path('statistics/', views.statistics_view, name='statistics'),
-    path('accounts/profile/', profile),  # исправлено
+    path('accounts/profile/', profile),
     path('events/', views.event_list, name='event_list'),
     path('event/create/', views.event_create, name='event_create'),
     path('event/<int:pk>/edit/', views.event_edit, name='event_edit'),

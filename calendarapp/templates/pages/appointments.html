@@ -2,71 +2,99 @@
 {% block title %}Мои встречи — CalendarApp{% endblock %}
 
 {% block extra_css %}
-    <style>
-        table.appointments-table {
-            border-collapse: collapse;
-            width: 100%;
-            font-size: 1.05em;
-        }
+<style>
+    table.appointments-table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 1.05em;
+    }
 
-        .appointments-table th, .appointments-table td {
-            border-bottom: 1px solid #d6dee2;
-            padding: 10px 6px;
-        }
+    .appointments-table th, .appointments-table td {
+        border-bottom: 1px solid #d6dee2;
+        padding: 10px 6px;
+    }
 
-        .appointments-table th {
-            background: #f6f8fa;
-            text-align: left;
-        }
+    .appointments-table th {
+        background: #f6f8fa;
+        text-align: left;
+    }
 
-        .badge {
-            padding: 3px 8px;
-            border-radius: 5px;
-            color: white;
-            font-size: 0.95em;
-        }
+    .badge {
+        padding: 3px 8px;
+        border-radius: 5px;
+        color: white;
+        font-size: 0.95em;
+    }
 
-        .badge-pending {
-            background: #aaa;
-        }
+    .badge-pending {
+        background: #aaa;
+    }
 
-        .badge-confirmed {
-            background: #48b6a1;
-        }
+    .badge-confirmed {
+        background: #48b6a1;
+    }
 
-        .badge-cancelled {
-            background: #e04747;
-        }
+    .badge-cancelled {
+        background: #e04747;
+    }
 
-        .user-tag {
-            color: #3875d7;
-            font-weight: 500;
-        }
+    .user-tag {
+        color: #3875d7;
+        font-weight: 500;
+    }
 
-        .event-link {
-            text-decoration: none;
-            color: #222;
-            font-weight: 500;
-        }
+    .event-link {
+        text-decoration: none;
+        color: #222;
+        font-weight: 500;
+    }
 
-        .details-cell {
-            max-width: 200px;
-            word-break: break-word;
-        }
+    .details-cell {
+        max-width: 200px;
+        word-break: break-word;
+    }
 
-        .empty-msg {
-            margin: 2em auto;
-            text-align: center;
-            color: #888;
-        }
-    </style>
+    .empty-msg {
+        margin: 2em auto;
+        text-align: center;
+        color: #888;
+    }
+
+    .actions form {
+        display: inline-block;
+        margin-right: 5px;
+    }
+
+    .btn {
+        border: none;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.95em;
+        cursor: pointer;
+        text-align: center;
+    }
+
+    .btn-confirm {
+        background: #48b6a1;
+        color: white;
+    }
+
+    .btn-cancel {
+        background: #e04747;
+        color: white;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-    <h2 style="margin-bottom:1em;">Ваши встречи</h2>
-    {% if appointments %}
-        <table class="appointments-table">
-            <thead>
+<h2 style="margin-bottom:1em;">Ваши встречи</h2>
+{% if appointments %}
+    <table class="appointments-table">
+        <thead>
             <tr>
                 <th>Дата</th>
                 <th>Время</th>
@@ -75,40 +103,54 @@
                 <th>Событие</th>
                 <th>Детали</th>
                 <th>Статус</th>
+                <th>Действия</th>
             </tr>
-            </thead>
-            <tbody>
+        </thead>
+        <tbody>
             {% for appt in appointments %}
-                <tr>
-                    <td>{{ appt.date }}</td>
-                    <td>{{ appt.time|default:"—" }}</td>
-                    <td><span class="user-tag">@{{ appt.organizer.username }}</span></td>
-                    <td><span class="user-tag">@{{ appt.invitee.username }}</span></td>
-                    <td>
-                        {% if appt.event %}
-                            <a href="{% url 'event_detail' appt.event.id %}"
-                               class="event-link">{{ appt.event.name }}</a>
-                        {% else %}
-                            <span>—</span>
-                        {% endif %}
-                    </td>
-                    <td class="details-cell" title="{{ appt.details|default:'—' }}">
-                        {{ appt.details|default:"—" }}
-                    </td>
-                    <td>
-                        {% if appt.status == 'pending' %}
-                            <span class="badge badge-pending">Ожидание</span>
-                        {% elif appt.status == 'confirmed' %}
-                            <span class="badge badge-confirmed">Подтверждено</span>
-                        {% else %}
-                            <span class="badge badge-cancelled">Отменено</span>
-                        {% endif %}
-                    </td>
-                </tr>
+            <tr>
+                <td>{{ appt.date }}</td>
+                <td>{{ appt.time|default:"—" }}</td>
+                <td><span class="user-tag">@{{ appt.organizer.username }}</span></td>
+                <td><span class="user-tag">@{{ appt.invitee.username }}</span></td>
+                <td>
+                    {% if appt.event %}
+                        <a href="{% url 'event_detail' appt.event.id %}" class="event-link">{{ appt.event.name }}</a>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+                <td class="details-cell" title="{{ appt.details|default:'—' }}">
+                    {{ appt.details|default:"—" }}
+                </td>
+                <td>
+                    {% if appt.status == 'pending' %}
+                        <span class="badge badge-pending">Ожидание</span>
+                    {% elif appt.status == 'confirmed' %}
+                        <span class="badge badge-confirmed">Подтверждено</span>
+                    {% else %}
+                        <span class="badge badge-cancelled">Отменено</span>
+                    {% endif %}
+                </td>
+                <td class="actions">
+                    {% if appt.status == 'pending' %}
+                        <form method="POST" action="{% url 'update_appointment_status' appt.id %}">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="confirm" class="btn btn-confirm">Принять</button>
+                        </form>
+                        <form method="POST" action="{% url 'update_appointment_status' appt.id %}">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="cancel" class="btn btn-cancel">Отклонить</button>
+                        </form>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+            </tr>
             {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <div class="empty-msg">Нет назначенных встреч.</div>
-    {% endif %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-msg">Нет назначенных встреч.</div>
+{% endif %}
 {% endblock %}
