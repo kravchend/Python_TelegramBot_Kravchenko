@@ -35,6 +35,8 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
+ASGI_APPLICATION = 'TelegramBot_Calendar.asgi.application'
+
 # Application definition
 
 INSTALLED_APPS = [

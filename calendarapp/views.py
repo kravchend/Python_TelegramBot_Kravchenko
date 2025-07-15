@@ -6,11 +6,11 @@ from .models import User, Event, Appointment, BotStatistics
 from django.db.models import Q
 from datetime import datetime
 from .forms import EventForm, SiteRegistrationForm
-from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
+from django.http import HttpResponseForbidden, JsonResponse, HttpResponse, HttpResponseServerError
 import csv
 from django.contrib.auth import login, logout
 from django.views.decorators.http import require_POST
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from bot.handlers.users import get_bot
 from django.contrib import messages
 
@@ -42,31 +42,43 @@ def site_register_view(request):
 @login_required
 @require_POST
 async def update_appointment_status(request, pk):
-    appointment = get_object_or_404(Appointment, pk=pk, invitee=request.user)
-    action = request.POST.get('action')
+    try:
+        appointment = await sync_to_async(get_object_or_404)(Appointment, pk=pk, invitee=request.user)
+        action = request.POST.get('action')
 
-    if action == 'confirm':
-        appointment.status = 'confirmed'
-        message_to_invitee = "Вы подтвердили встречу."
-        message_to_organizer = f"{appointment.invitee.username} подтвердил участие в событии '{appointment.event.name}'."
-    elif action == 'cancel':
-        appointment.status = 'cancelled'
-        message_to_invitee = "Вы отклонили встречу."
-        message_to_organizer = f"{appointment.invitee.username} отклонил приглашение на событие '{appointment.event.name}'."
-    else:
-        return HttpResponseForbidden("Некорректное действие.")
+        if action == 'confirm':
+            await sync_to_async(setattr)(appointment, 'status', 'confirmed')
+            message_to_invitee = "Вы подтвердили встречу."
+            message_to_organizer = (
+                f"{await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие "
+                f"в событии '{await sync_to_async(lambda: appointment.event.name)()}'."
+            )
+        elif action == 'cancel':
+            await sync_to_async(setattr)(appointment, 'status', 'cancelled')
+            message_to_invitee = "Вы отклонили встречу."
+            message_to_organizer = (
+                f"{await sync_to_async(lambda: appointment.invitee.username)()} отклонил приглашение "
+                f"на событие '{await sync_to_async(lambda: appointment.event.name)()}'."
+            )
+        else:
+            return HttpResponseForbidden("Некорректное действие.")
 
-    appointment.save()
+        await sync_to_async(appointment.save)()
 
-    if appointment.organizer.telegram_id:
-        try:
-            bot = await get_bot()
-            await bot.send_message(chat_id=appointment.organizer.telegram_id, text=message_to_organizer)
-        except Exception as e:
-            print(f"Ошибка отправки уведомления организатору: {e}")
+        organizer_telegram_id = await sync_to_async(lambda: appointment.organizer.telegram_id)()
+        if organizer_telegram_id:
+            try:
+                bot = await get_bot()
+                await bot.send_message(chat_id=organizer_telegram_id, text=message_to_organizer)
+            except Exception as e:
+                print(f"Ошибка отправки уведомления организатору: {e}")
 
-    messages.success(request, message_to_invitee)
-    return redirect('user_appointments')
+        messages.success(request, message_to_invitee)
+        return redirect('user_appointments')
+
+    except Exception as e:
+        print(f"Ошибка в обработке запроса: {e}")
+        return HttpResponseServerError("Произошла ошибка при обработке вашего запроса.")
 
 
 @login_required
@@ -295,5 +307,9 @@ async def send_invitation_to_telegram(invitee, event, appointment):
                 f"Вас пригласили на событие '{event.name}' {event.date} в {event.time}.",
                 reply_markup=appointment_action_keyboard(appointment.id)
             )
+            print(f"Приглашение отправлено пользователю: {invitee.telegram_id}")
         except Exception as e:
-            print(f"Ошибка при отправке уведомления: {e}")
+            # Подробное логирование ошибки
+            print(f"Ошибка при отправке уведомления пользователю {invitee.telegram_id}: {e}")
+    else:
+        print(f"Ошибка: пользователь {invitee.username} не привязал Telegram ID")
