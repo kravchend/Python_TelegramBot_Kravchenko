@@ -3,7 +3,6 @@ from aiogram.filters import Command
 from bot.handlers.keyboards import main_keyboard, get_invite_keyboard
 from bot.calendar_instance import calendar
 from datetime import datetime
-from bot.handlers.appointments import offer_invite_after_event
 from bot.handlers.types import DummyEvent
 router = Router()
 
@@ -105,7 +104,6 @@ async def process_calendar_creation(message: types.Message, **kwargs):
                         "Вы можете пригласить участников на это событие:",
                         reply_markup=get_invite_keyboard(event_id)
                     )
-                    await offer_invite_after_event(message, my_idx)
         except Exception as e:
             await message.answer(
                     f"Ошибка в данных события: {e}",

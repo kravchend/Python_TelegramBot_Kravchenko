@@ -7,115 +7,102 @@ from asgiref.sync import sync_to_async
 from bot.calendar_instance import calendar
 from calendarapp.models import User, Event, Appointment
 from bot.handlers.users import get_bot
+from calendarapp.utils import send_invitation_to_user
+from aiogram.exceptions import TelegramBadRequest
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
 
-def get_appointment_model():
-    from calendarapp.models import User, Event, Appointment
-    return User, Event, Appointment
+@router.message(lambda message: message.text == "🔎 Статус приглашений")
+async def status_button_handler(message: types.Message):
+    """Обработчик нажатия кнопки статуса"""
+    await display_status(message)
 
 
-@router.message(Command("myappointments"))
-async def list_my_appointments(message: types.Message):
+@router.message(Command("status"))
+async def display_status(message: types.Message):
+    """Отображение статуса приглашений для пользователя"""
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
+
     if not user_id:
-        await message.answer(
-            "Вы не зарегистрированы. Используйте /register",
-            reply_markup=main_keyboard()
-        )
+        await message.answer("Вы не зарегистрированы. Используйте /register.", reply_markup=main_keyboard())
         return
-    user = await sync_to_async(User.objects.get)(id=user_id)
-    qs = await calendar.get_busy_appointments(user)
-    if not qs:
-        await message.answer("Встреч не найдено", reply_markup=main_keyboard())
-        return
-    lines = [
-        f"Дата: {a['date']} {a['time']}, статус: {a['status']}, event_id: {a['event_id']}"
-        for a in qs
-    ]
-    await message.answer("Ваши встречи:\n" + "\n".join(lines))
 
+    # Выборка приглашений через ORM
+    invitee_appointments = await sync_to_async(lambda: list(
+        Appointment.objects.filter(invitee_id=user_id).select_related('event', 'organizer')
+    ))()
+    organizer_appointments = await sync_to_async(lambda: list(
+        Appointment.objects.filter(organizer_id=user_id).select_related('event', 'invitee')
+    ))()
 
-@router.message(Command("pendingappointments"))
-async def list_pending_appointments(message: types.Message):
-    telegram_id = message.from_user.id
-    invitee = await calendar.get_user_db_id(telegram_id)
-    if not invitee:
-        await message.answer("Вы не зарегистрированы.", reply_markup=main_keyboard())
-        return
-    pending = await sync_to_async(lambda: list(Appointment.objects.filter(invitee=invitee, status='pending').all()))()
-    if not pending:
-        await message.answer("Нет ожидающих встреч.", reply_markup=main_keyboard())
-        return
-    for appt in pending:
+    # Формирование текста статуса
+    status_display = {
+        "pending": "⏳ Ожидание подтверждения",
+        "confirmed": "✅ Подтверждённое",
+        "cancelled": "❌ Отклонённое"
+    }
+
+    # Информация для участников
+    for appt in invitee_appointments:
         event = appt.event
-        await message.answer(
-            f"Встреча от {appt.organizer.username or appt.organizer.telegram_id}\n"
+        organizer = appt.organizer
+        text = (
             f"Событие: {event.name}\n"
-            f"Дата: {appt.date} {appt.time}\n"
-            f"Описание: {appt.details}",
-            reply_markup=appointment_action_keyboard(appt.id)
+            f"Дата: {event.date} {event.time}\n"
+            f"Организатор: {organizer.username}\n"
+            f"Статус: {status_display.get(appt.status, '❓ Неизвестно')}"
         )
+        if appt.status == "pending":
+            keyboard = appointment_action_keyboard(appt.id)
+            await message.answer(text, reply_markup=keyboard)
+        else:
+            await message.answer(text)
 
+    # Информация для организаторов
+    if organizer_appointments:
+        text = "🔹 **Как организатор:**\n"
+        for appt in organizer_appointments:
+            event = appt.event
+            invitee = appt.invitee
+            text += (
+                f"Событие: {event.name} | Дата: {event.date} {event.time}\n"
+                f"Участник: {invitee.username}\n"
+                f"Статус: {status_display.get(appt.status, '❓ Неизвестно')}\n\n"
+            )
+        await message.answer(text, reply_markup=main_keyboard())
 
-async def invite_user_handler(message, organizer, invitee, event):
-    if invitee.telegram_id is None:
-        await message.answer(f"Пользователь {invitee.username} не привязал Telegram-аккаунт. "
-                             "Он не может быть приглашён через Telegram.", reply_markup=main_keyboard())
-        return
-
-    appointment = await sync_to_async(calendar.invite_user_to_event)(
-        organizer, invitee, event, event.date, event.time, event.details
-    )
-    if not appointment:
-        await message.answer("Пользователь уже приглашён или приглашение активно.")
-        return
-
-    bot = await get_bot()
-    await bot.send_message(
-        invitee.telegram_id,
-        f"Вас пригласили на событие '{event.name}' {event.date} в {event.time}.",
-        reply_markup=get_invite_keyboard(appointment.id)
-    )
-    await message.answer(
-        f"Приглашение отправлено {invitee.username}.",
-        reply_markup=main_keyboard()
-    )
-
-
-async def offer_invite_after_event(message, event_id):
-    telegram_id = message.from_user.id
-    users = await get_invitable_users(event_id=event_id, exclude_user_id=telegram_id)
-    keyboard = get_users_invite_keyboard(event_id, users)
-    await message.answer(
-        "Событие создано! Кого пригласить?\n\nВыберите пользователя:",
-        reply_markup=keyboard
-    )
+    if not invitee_appointments and not organizer_appointments:
+        await message.answer("У вас нет встреч или приглашений.", reply_markup=main_keyboard())
 
 
 @router.callback_query(lambda cq: cq.data.startswith("invite_"))
 async def invite_user_callback(callback_query: types.CallbackQuery):
-    print("DEBUG: Callback data:", callback_query.data)
+    """Обработчик колбэка для приглашения пользователей"""
     data = callback_query.data
+
     if data == "invite_done":
         await callback_query.message.edit_text(
             "Приглашение завершено!", reply_markup=None
         )
         await callback_query.message.answer(
             "Вы вернулись в главное меню.",
-            reply_markup=main_keyboard()
+            reply_markup=main_keyboard(),
         )
         return
 
     parts = data.split("_")
-
     if len(parts) != 3:
         await callback_query.answer("Некорректный формат кнопки!", show_alert=True)
         return
 
     _, event_id, invitee_tg_id = parts
+
     try:
         event_id = int(event_id)
         invitee_tg_id = int(invitee_tg_id)
@@ -124,40 +111,53 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
         event = await sync_to_async(Event.objects.get)(id=event_id)
         organizer = await sync_to_async(User.objects.get)(telegram_id=organizer_tg_id)
         invitee = await sync_to_async(User.objects.get)(telegram_id=invitee_tg_id)
-        exist = await sync_to_async(Appointment.objects.filter)(
+
+        appointment = await sync_to_async(lambda: Appointment.objects.filter(
             event=event,
-            invitee=invitee,
-            status__in=["pending", "confirmed"]
-        )
-        exist = await sync_to_async(exist.exists)()
-        if exist:
+            invitee=invitee
+        ).first())()
+
+        if appointment and appointment.status in ["pending", "confirmed"]:
             await callback_query.answer(
-                "Пользователь уже приглашён или приглашение активно.",
+                f"Уже существует активное приглашение для {invitee.username}.",
                 show_alert=True
             )
-        else:
+            return
+
+        if not appointment or appointment.status == "cancelled":
             appointment = await sync_to_async(Appointment.objects.create)(
                 event=event,
                 organizer=organizer,
                 invitee=invitee,
                 date=event.date,
-                time=getattr(event, 'time', None),
-                status="pending"
+                time=event.time,
+                status="pending",
             )
-            bot = await get_bot()
-            await bot.send_message(
-                invitee.telegram_id,
-                f"Вас пригласили на событие '{event.name}' {event.date} в {event.time}.",
-                reply_markup=appointment_action_keyboard(appointment.id)
+
+        result = await send_invitation_to_user(invitee, event, appointment)
+
+        if result == "SENT":
+            await callback_query.answer(f"{invitee.username} приглашён через Telegram!", show_alert=True)
+        else:
+            await callback_query.answer(
+                f"{invitee.username} получил уведомление через сайт.",
+                show_alert=True
             )
-            await callback_query.answer(f"{invitee.username} приглашён!", show_alert=True)
 
         users = await get_invitable_users(event_id=event_id, exclude_user_id=organizer_tg_id)
-        keyboard = get_users_invite_keyboard(event.id, users)
-        await callback_query.message.edit_text(
-            "Можно пригласить ещё пользователей:", reply_markup=keyboard
-        )
+        if not users:
+            await callback_query.message.edit_text(
+                "Все пользователи приглашены! Спасибо.",
+            )
+        else:
+            keyboard = get_users_invite_keyboard(event.id, users)
+            await callback_query.message.edit_text(
+                "Кого пригласить на это событие? Выберите пользователя:",
+                reply_markup=keyboard
+            )
+
     except Exception as e:
+        logger.error(f"Ошибка при обработке callback: {e}")
         await callback_query.answer(f"Ошибка: {e}", show_alert=True)
 
 
@@ -166,74 +166,72 @@ async def appointment_action_callback(callback: types.CallbackQuery):
     bot = await get_bot()
     data = callback.data
 
+    logger.debug(f"Получен callback: {data}")
+
     try:
+        # Определение действия: подтверждение или отмена
         if data.startswith("appt_confirm_"):
             appointment_id = int(data.replace("appt_confirm_", ""))
             action = "confirmed"
-            text = "Встреча подтверждена!"
+            participant_action_text = "Вы подтвердили участие в событии!"
+            organizer_action_text = "подтвердил"
         elif data.startswith("appt_cancel_"):
             appointment_id = int(data.replace("appt_cancel_", ""))
             action = "cancelled"
-            text = "Встреча отклонена!"
+            participant_action_text = "Вы отклонили приглашение на событие!"
+            organizer_action_text = "отклонил"
         else:
             raise ValueError("Некорректный формат данных.")
 
-        # Получение объекта Appointment через sync_to_async
+        # Получение объекта встречи
         appointment = await sync_to_async(Appointment.objects.get)(id=appointment_id)
-
-        # Проверка существования встречи
-        if not appointment:
-            await callback.answer("Встреча не найдена.", show_alert=True)
-            return
-
-        # Получение invitee через sync_to_async
         invitee_telegram_id = await sync_to_async(lambda: appointment.invitee.telegram_id)()
 
+        # Проверка, что действие выполняется приглашённым пользователем
         if callback.from_user.id != invitee_telegram_id:
-            await callback.answer(
-                "Только приглашённый может подтвердить/отклонить встречу.",
-                show_alert=True
-            )
+            await callback.answer("Только приглашённый может выполнить это действие.", show_alert=True)
             return
 
-        # Проверка статуса встречи через sync_to_async
-        status = await sync_to_async(lambda: appointment.status)()
-        if status != "pending":
-            await callback.answer("Приглашение уже неактуально.", show_alert=True)
-            return
+        # Обновление статуса назначения
+        def update_status():
+            appointment.status = action
+            appointment.save()
 
-        # Обновление статуса встречи через sync_to_async
-        await sync_to_async(lambda: setattr(appointment, "status", action))()
-        await sync_to_async(appointment.save)()
+        await sync_to_async(update_status)()
 
-        # Получение организатора и его Telegram ID через sync_to_async
+        # Уведомление организатора о действии участника
         organizer_telegram_id = await sync_to_async(lambda: appointment.organizer.telegram_id)()
-
-        # Подготовка уведомления для организатора
         invitee_username = await sync_to_async(lambda: appointment.invitee.username)()
         event_name = await sync_to_async(lambda: appointment.event.name)()
-        organizer_message = (
-            f"{invitee_username or 'Пользователь'} "
-            f"{'подтвердил' if action == 'confirmed' else 'отклонил'} участие "
-            f"в событии \"{event_name}\"."
-        )
 
-        # Отправка сообщения организатору
         if organizer_telegram_id:
+            organizer_message = (
+                f"⏳ Пользователь {invitee_username} {organizer_action_text} "
+                f"приглашение на событие \"{event_name}\"."
+            )
             try:
                 await bot.send_message(organizer_telegram_id, organizer_message)
-            except Exception as e:
-                print(f"Ошибка отправки уведомления организатору: {e}")
+            except TelegramBadRequest as e:
+                logger.error(
+                    f"Ошибка отправки уведомления организатору (Telegram ID {organizer_telegram_id}): {e}"
+                )
 
-        # Обновление текста сообщения в чате пользователя
-        await callback.message.edit_text(text)
-        await callback.answer(text)
+        # Уведомление участника о завершении действия
+        await callback.message.edit_text(participant_action_text)
+        await callback.answer(participant_action_text)
 
+    # Обработка ошибок
     except Appointment.DoesNotExist:
         await callback.answer("Встреча не найдена.", show_alert=True)
+    except ValueError as e:
+        await callback.answer("Некорректные данные.", show_alert=True)
+    except TelegramBadRequest as e:
+        logger.error(f"Ошибка отправки сообщения: {e}")
+        await callback.answer("Ошибка отправки сообщения. Возможно, пользователь заблокировал бота.", show_alert=True)
     except Exception as e:
-        print(f"Ошибка при обработке callback: {e}")  # Логирование ошибок
-        await callback.answer(f"Произошла ошибка: {e}", show_alert=True)
+        logger.error(f"Ошибка обработки callback: {e}")
+        await callback.answer("Произошла ошибка. Попробуйте позже.", show_alert=True)
+
 
 
 @sync_to_async
@@ -251,6 +249,7 @@ def get_appointment_by_id(app_id):
 
 @router.message(Command("invite"))
 async def command_invite_user(message: types.Message):
+    """Обработчик команды invite"""
     args = message.text.strip().split()
     if len(args) != 5:
         await message.answer(
@@ -259,11 +258,11 @@ async def command_invite_user(message: types.Message):
         )
         return
 
-    _, invitee_telegram_id, event_id, date, time = args
-    organizer_telegram_id = message.from_user.id
+    _, invitee_tg_id, event_id, date, time = args
+    organizer_tg_id = message.from_user.id
 
-    organizer = await calendar.get_user_db_id(organizer_telegram_id)
-    invitee = await calendar.get_user_db_id(int(invitee_telegram_id))
+    organizer = await calendar.get_user_db_id(organizer_tg_id)
+    invitee = await calendar.get_user_db_id(int(invitee_tg_id))
     event = await sync_to_async(Event.objects.get)(id=int(event_id))
 
     if not (organizer and invitee and event):
@@ -293,7 +292,7 @@ async def command_invite_user(message: types.Message):
 
     bot = await get_bot()
     await bot.send_message(
-        invitee_telegram_id,
+        invitee_tg_id,
         f"Вас пригласили на событие '{event.name}' {date} в {time}.",
         reply_markup=get_invite_keyboard(appt.id)
     )

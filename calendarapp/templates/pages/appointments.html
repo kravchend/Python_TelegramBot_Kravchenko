@@ -3,6 +3,7 @@
 
 {% block extra_css %}
 <style>
+    /* Сохранение стилей таблицы */
     table.appointments-table {
         border-collapse: collapse;
         width: 100%;
@@ -87,12 +88,21 @@
     .btn:hover {
         opacity: 0.9;
     }
+
+    .section-title {
+        margin-top: 2em;
+        font-size: 1.3em;
+        color: #333;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <h2 style="margin-bottom:1em;">Ваши встречи</h2>
-{% if appointments %}
+
+<!-- Ожидающие подтверждения -->
+<h3 class="section-title">Ожидающие подтверждения</h3>
+{% if pending_appointments %}
     <table class="appointments-table">
         <thead>
             <tr>
@@ -107,7 +117,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for appt in appointments %}
+            {% for appt in pending_appointments %}
             <tr>
                 <td>{{ appt.date }}</td>
                 <td>{{ appt.time|default:"—" }}</td>
@@ -136,16 +146,10 @@
                     {{ appt.details|default:"—" }}
                 </td>
                 <td>
-                    {% if appt.status == 'pending' %}
-                        <span class="badge badge-pending">Ожидание</span>
-                    {% elif appt.status == 'confirmed' %}
-                        <span class="badge badge-confirmed">Подтверждено</span>
-                    {% else %}
-                        <span class="badge badge-cancelled">Отменено</span>
-                    {% endif %}
+                    <span class="badge badge-pending">Ожидание</span>
                 </td>
                 <td class="actions">
-                    {% if appt.status == 'pending' and appt.invitee == user %}
+                    {% if appt.invitee == user %}
                         <!-- Кнопки действия -->
                         <form method="POST" action="{% url 'update_appointment_status' appt.id %}">
                             {% csrf_token %}
@@ -168,6 +172,120 @@
         </tbody>
     </table>
 {% else %}
-    <div class="empty-msg">Нет назначенных встреч.</div>
+    <div class="empty-msg">Нет ожидающих встреч.</div>
+{% endif %}
+
+<!-- Подтвержденные встречи -->
+<h3 class="section-title">Подтвержденные встречи</h3>
+{% if confirmed_appointments %}
+    <table class="appointments-table">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Организатор</th>
+                <th>Приглашённый</th>
+                <th>Событие</th>
+                <th>Детали</th>
+                <th>Статус</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appt in confirmed_appointments %}
+            <tr>
+                <td>{{ appt.date }}</td>
+                <td>{{ appt.time|default:"—" }}</td>
+                <td>
+                    {% if appt.organizer %}
+                        <span class="user-tag">@{{ appt.organizer.username }}</span>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if appt.invitee %}
+                        <span class="user-tag">@{{ appt.invitee.username }}</span>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if appt.event %}
+                        <a href="{% url 'event_detail' appt.event.id %}" class="event-link">{{ appt.event.name }}</a>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+                <td class="details-cell" title="{{ appt.details|default:'—' }}">
+                    {{ appt.details|default:"—" }}
+                </td>
+                <td>
+                    <span class="badge badge-confirmed">Подтверждено</span>
+                </td>
+                <td class="actions"><span>—</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-msg">Нет подтвержденных встреч.</div>
+{% endif %}
+
+<!-- Отклоненные встречи -->
+<h3 class="section-title">Отмененные встречи</h3>
+{% if cancelled_appointments %}
+    <table class="appointments-table">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Организатор</th>
+                <th>Приглашённый</th>
+                <th>Событие</th>
+                <th>Детали</th>
+                <th>Статус</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appt in cancelled_appointments %}
+            <tr>
+                <td>{{ appt.date }}</td>
+                <td>{{ appt.time|default:"—" }}</td>
+                <td>
+                    {% if appt.organizer %}
+                        <span class="user-tag">@{{ appt.organizer.username }}</span>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if appt.invitee %}
+                        <span class="user-tag">@{{ appt.invitee.username }}</span>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if appt.event %}
+                        <a href="{% url 'event_detail' appt.event.id %}" class="event-link">{{ appt.event.name }}</a>
+                    {% else %}
+                        <span>—</span>
+                    {% endif %}
+                </td>
+                <td class="details-cell" title="{{ appt.details|default:'—' }}">
+                    {{ appt.details|default:"—" }}
+                </td>
+                <td>
+                    <span class="badge badge-cancelled">Отменено</span>
+                </td>
+                <td class="actions"><span>—</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-msg">Нет отмененных встреч.</div>
 {% endif %}
 {% endblock %}

@@ -1,6 +1,6 @@
 from django.urls import path, include
 from . import views
-from .views import profile, custom_logout
+from .views import profile
 
 urlpatterns = [
     path('', views.home, name='home'),

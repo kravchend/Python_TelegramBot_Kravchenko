@@ -121,13 +121,18 @@
 {% if user.is_authenticated %}
     <div style="text-align: right; padding: 0 20px 5px 0; color:#4078c0;">
         Привет, {{ user.username }}!
+        {% if user.telegram_id %}
+            (Telegram ID: {{ user.telegram_id }})
+        {% endif %}
     </div>
 {% endif %}
 <main>
     {% if messages %}
         <ul>
             {% for message in messages %}
-                <li style="color: #27ae60;">{{ message }}</li>
+                <li style="color: {% if message.tags == 'error' %}#d9534f{% else %}#27ae60{% endif %};">
+                    {{ message }}
+                </li>
             {% endfor %}
         </ul>
     {% endif %}

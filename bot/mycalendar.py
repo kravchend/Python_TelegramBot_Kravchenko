@@ -169,53 +169,59 @@ class Calendar:
             for e in events
         ]
 
-    async def get_busy_appointments(self, user, date=None):
-        q = Appointment.objects.filter(
-            models.Q(organizer=user) | models.Q(invitee=user),
-            status__in=['pending', 'confirmed']
-        )
-        if date:
-            q = q.filter(date=date)
-        return await sync_to_async(lambda: list(q.values('date', 'time', 'status', 'event_id')))()
-
     async def invite_user_to_event(self, organizer, invitee, event, date, time, details=""):
+        # Проверка и преобразование даты
         if isinstance(date, str):
             try:
                 date = datetime.strptime(date, "%Y-%m-%d").date()
             except Exception as e:
-                print(f"Ошибка парсинга даты: {e}")
+                logger.error(f"Ошибка парсинга даты: {e}")
+                return None
+
+        # Проверка и преобразование времени
         if isinstance(time, str):
             try:
-                try:
-                    time = datetime.strptime(time, "%H:%M").time()
-                except ValueError:
-                    time = datetime.strptime(time, "%H:%M:%S").time()
+                time = datetime.strptime(time, "%H:%M").time()
             except Exception as e:
-                print(f"Ошибка парсинга времени: {e}")
+                logger.error(f"Ошибка парсинга времени: {e}")
+                return None
 
-        print(
-            f"DEBUG-invite: organizer={organizer}, invitee={invitee}, event={event}, date={date} ({type(date)}), time={time} ({type(time)}), details={details}")
-
-        appointment, created = await sync_to_async(Appointment.objects.get_or_create)(
-            organizer=organizer,
-            invitee=invitee,
-            event=event,
-            date=date,
-            time=time,
-            defaults={
-                "details": details if details else getattr(event, 'details', ''),
-                "status": "pending"
-            }
+        logger.debug(
+            f"DEBUG-invite: organizer={organizer.id}, invitee={invitee.id}, event={event.id}, date={date}, time={time}, details={details}"
         )
-        print(
-            f"DEBUG-invite-res: appointment={appointment}, created={created}, status={getattr(appointment, 'status', None)}")
-        # Блок возвращения None если уже есть ожидающая или подтверждённая встреча
-        if not created and appointment.status in ["pending", "confirmed"]:
+
+        try:
+            # Функция для обёртки вызова get_or_create
+            def create_or_get_appointment():
+                return Appointment.objects.get_or_create(
+                    organizer=organizer,
+                    invitee=invitee,
+                    event=event,
+                    date=date,
+                    time=time,
+                    defaults={"details": details, "status": "pending"},
+                )
+
+            # Асинхронный вызов функции через sync_to_async
+            appointment, created = await sync_to_async(create_or_get_appointment)()
+
+            if not created:  # Если объект уже существует
+                if appointment.status in ["pending", "confirmed"]:
+                    logger.info(
+                        f"Приглашение уже активно: статус '{appointment.status}' для invitee={invitee.id}, event={event.id}"
+                    )
+                    return None
+                else:  # Если статус был отменен или другой — обновляем до `pending`
+                    logger.info(f"Обновление статуса на 'pending' для invitee={invitee.id}, event={event.id}")
+                    appointment.status = "pending"
+                    await sync_to_async(appointment.save)()
+
+            logger.info(f"Приглашение создано: {appointment}")
+            return appointment
+
+        except Exception as e:
+            logger.error(f"Ошибка создания приглашения: {e}")
             return None
-        elif not created:
-            appointment.status = "pending"
-            await sync_to_async(appointment.save)()
-        return appointment
 
     async def make_event_public(self, event_id: int, user_id: int) -> bool:
         try:

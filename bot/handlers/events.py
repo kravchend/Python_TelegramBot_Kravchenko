@@ -1,4 +1,4 @@
-from aiogram import F, Router, types, Bot
+from aiogram import F, Router, types
 from bot.calendar_instance import calendar
 from aiogram.filters import Command
 from bot.handlers.keyboards import (

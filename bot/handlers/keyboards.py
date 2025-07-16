@@ -8,8 +8,8 @@ def main_keyboard():
     keyboard = [
         [
             types.KeyboardButton(text="📆 Календарь"),
+            types.KeyboardButton(text="🔎 Статус приглашений"),
         ],
-
         [
             types.KeyboardButton(text="📆 Календарь: создать событие"),
             types.KeyboardButton(text="📅 Календарь: список событий"),
@@ -23,7 +23,8 @@ def main_keyboard():
             types.KeyboardButton(text="⬇️ Выгрузить мои события"),
         ],
     ]
-    return types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+    # Добавляем параметр is_persistent=True, чтобы клавиатура была закрепленной
+    return types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True, is_persistent=True)
 
 
 def get_invite_keyboard(event_id):

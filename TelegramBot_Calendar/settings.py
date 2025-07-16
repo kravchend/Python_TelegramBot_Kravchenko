@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 
 from pathlib import Path
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -130,6 +129,9 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+FAVICON_PATH = '/static/icons/favicon.ico'
+APPLE_TOUCH_ICON_PATH = '/static/icons/apple-touch-icon.png'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

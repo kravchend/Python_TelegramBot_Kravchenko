@@ -1,8 +1,21 @@
 from django import forms
 from .models import Event, User
+from django.core.exceptions import ValidationError
 
 
 class EventForm(forms.ModelForm):
+    def clean_date(self):
+        date = self.cleaned_data.get('date')
+        if not date:
+            raise ValidationError("Поле даты обязательно для заполнения.")
+        return date
+
+    def clean_time(self):
+        time = self.cleaned_data.get('time')
+        if not time:
+            raise ValidationError("Поле времени обязательно для заполнения.")
+        return time
+
     class Meta:
         model = Event
         fields = ['name', 'date', 'time', 'details', 'is_public']
