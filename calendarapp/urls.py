@@ -24,5 +24,3 @@ urlpatterns = [
     path('export/csv/', views.export_events_csv, name='export_events_csv'),
     path('api/', include('calendarapp.api_urls')),
 ]
-
-

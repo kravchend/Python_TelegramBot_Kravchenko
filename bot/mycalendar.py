@@ -1,7 +1,6 @@
 from calendarapp.models import User, Event, BotStatistics, Appointment
 from asgiref.sync import sync_to_async
 from datetime import datetime
-from django.db import models
 import calendar as pycalendar
 import logging
 
@@ -170,7 +169,6 @@ class Calendar:
         ]
 
     async def invite_user_to_event(self, organizer, invitee, event, date, time, details=""):
-        # Проверка и преобразование даты
         if isinstance(date, str):
             try:
                 date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -178,7 +176,6 @@ class Calendar:
                 logger.error(f"Ошибка парсинга даты: {e}")
                 return None
 
-        # Проверка и преобразование времени
         if isinstance(time, str):
             try:
                 time = datetime.strptime(time, "%H:%M").time()
@@ -191,7 +188,6 @@ class Calendar:
         )
 
         try:
-            # Функция для обёртки вызова get_or_create
             def create_or_get_appointment():
                 return Appointment.objects.get_or_create(
                     organizer=organizer,
@@ -202,16 +198,15 @@ class Calendar:
                     defaults={"details": details, "status": "pending"},
                 )
 
-            # Асинхронный вызов функции через sync_to_async
             appointment, created = await sync_to_async(create_or_get_appointment)()
 
-            if not created:  # Если объект уже существует
+            if not created:
                 if appointment.status in ["pending", "confirmed"]:
                     logger.info(
                         f"Приглашение уже активно: статус '{appointment.status}' для invitee={invitee.id}, event={event.id}"
                     )
                     return None
-                else:  # Если статус был отменен или другой — обновляем до `pending`
+                else:
                     logger.info(f"Обновление статуса на 'pending' для invitee={invitee.id}, event={event.id}")
                     appointment.status = "pending"
                     await sync_to_async(appointment.save)()

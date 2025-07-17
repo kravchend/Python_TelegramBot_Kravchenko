@@ -11,4 +11,3 @@ if not API_TOKEN:
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot=bot)
-

@@ -23,7 +23,6 @@ def main_keyboard():
             types.KeyboardButton(text="⬇️ Выгрузить мои события"),
         ],
     ]
-    # Добавляем параметр is_persistent=True, чтобы клавиатура была закрепленной
     return types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True, is_persistent=True)
 
 

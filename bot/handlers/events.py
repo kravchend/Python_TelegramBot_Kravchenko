@@ -323,14 +323,14 @@ async def user_calendar_handler(message: types.Message):
         f"{e['id']}: {e['name']} | {e['date']} {e['time']} — {e['details']}"
         for e in events
     ]
-    await message.answer("Ваш календарь:\n" + "\n".join(lines), reply_markup=main_keyboard())
+    await message.answer("Ваш календарь: \n" + "\n".join(lines), reply_markup=main_keyboard())
 
 
 @router.message(F.text == "📆 Календарь")
 async def show_calendar_month(message: types.Message):
     html_calendar, year, month = calendar.render_for_template()
     txt = f"Календарь за {month:02}.{year}:\n\n"
-    await message.answer(txt + "(Открыть общий календарь на сайте: http://127.0.0.1:8000/calendar/)")
+    await message.answer(txt + "(Открыть календарь на сайте: http://127.0.0.1:8000/calendar/)")
 
 
 @router.message(Command("invite"))

@@ -59,7 +59,7 @@ async def process_calendar_creation(message: types.Message, **kwargs):
     elif step == "date":
         state["date"] = message.text.strip()
         state["step"] = "time"
-        await message.answer("Введите время события (ЧЧ:ММ или ЧЧ:ММ:СС")
+        await message.answer("Введите время события (ЧЧ:ММ): ")
     elif step == "time":
         state["time"] = message.text.strip()
         try:

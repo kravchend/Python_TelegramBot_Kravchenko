@@ -17,8 +17,6 @@ async def get_bot():
 async def send_welcome(message: types.Message):
     telegram_id = message.from_user.id
     username = message.from_user.username or f"User_{telegram_id}"
-
-    # Пытаемся создать или получить пользователя
     user, created = await sync_to_async(User.objects.get_or_create)(
         telegram_id=telegram_id,
         defaults={'username': username}

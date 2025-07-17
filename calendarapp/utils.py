@@ -6,9 +6,6 @@ logger = logging.getLogger(__name__)
 
 
 async def send_invitation_to_user(invitee, event, appointment):
-    """
-    Функция для отправки приглашения.
-    """
     logger.debug(f"Получатель: {invitee}, Событие: {event}, Встреча: {appointment}")
 
     if not invitee.telegram_id:
