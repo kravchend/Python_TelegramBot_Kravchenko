@@ -71,7 +71,6 @@ async def update_appointment_status(request, pk):
 
         await sync_to_async(appointment.save)()
 
-        # Уведомляем организатора через бота
         organizer_telegram_id = await sync_to_async(lambda: appointment.organizer.telegram_id)()
         if organizer_telegram_id:
             try:
@@ -80,7 +79,6 @@ async def update_appointment_status(request, pk):
             except Exception as e:
                 print(f"Ошибка отправки уведомления организатору: {e}")
 
-        # Уведомляем участника через бота
         invitee_telegram_id = await sync_to_async(lambda: appointment.invitee.telegram_id)()
         if invitee_telegram_id:
             try:
@@ -118,7 +116,6 @@ def event_create(request):
             print(
                 f"Event '{new_event.name}' создан для пользователя '{new_event.user.username}' на {new_event.date} в {new_event.time}."
             )
-            # После создания события перенаправляем на страницу приглашений
             return redirect('invite_users', pk=new_event.pk)
         else:
             print("Ошибки формы (event_create):", form.errors)
@@ -180,17 +177,11 @@ def calendar_view(request):
 
 @login_required
 def user_appointments(request):
-    """
-    Отображение встреч пользователя через сайт: как организатора и как участника.
-    """
     user = request.user
-
-    # Встречи, где пользователь является организатором или участником
     appointments = Appointment.objects.filter(
         Q(organizer=user) | Q(invitee=user)
     ).select_related("organizer", "invitee", "event").order_by("date", "time")
 
-    # Разделение встреч по статусам
     pending_appointments = appointments.filter(status="pending")
     confirmed_appointments = appointments.filter(status="confirmed")
     cancelled_appointments = appointments.filter(status="cancelled")
@@ -281,13 +272,10 @@ def export_events_csv(request):
 @login_required
 def event_detail(request, pk):
     event = get_object_or_404(Event, pk=pk, user=request.user)
-
-    # Пользователи, которых можно пригласить
     invitable_users = User.objects.exclude(id=request.user.id).exclude(
         id__in=Appointment.objects.filter(event=event).values_list('invitee_id', flat=True)
     )
 
-    # Уже приглашённые пользователи
     invited_users = Appointment.objects.filter(event=event).select_related('invitee')
 
     return render(request, 'pages/event_detail.html', {
@@ -299,10 +287,7 @@ def event_detail(request, pk):
 
 @login_required
 async def invite_users_to_event(request, pk):
-    # Получаем пользователя и событие
     event = await sync_to_async(get_object_or_404)(Event, pk=pk, user=request.user)
-
-    # Получить список пользователей для приглашения
     users = await sync_to_async(lambda: list(
         User.objects.exclude(id=request.user.id).exclude(
             id__in=Appointment.objects.filter(event=event).values_list('invitee_id', flat=True)
@@ -311,21 +296,17 @@ async def invite_users_to_event(request, pk):
 
     if request.method == "POST":
         selected_user_ids = request.POST.getlist("user_ids")
-
-        # Загружаем пользователей одним запросом
         selected_users = await sync_to_async(
             lambda: list(User.objects.filter(id__in=selected_user_ids))
         )()
         all_loaded_ids = [str(user.id) for user in selected_users]
         failed_users = list(set(selected_user_ids) - set(all_loaded_ids))
 
-        # Переменные для отчёта
         delivered_invites = []
         failed_invites = failed_users
 
         for user in selected_users:
             try:
-                # Создаем или обновляем приглашение
                 appointment, created = await sync_to_async(Appointment.objects.get_or_create)(
                     event=event,
                     organizer=request.user,
@@ -336,12 +317,9 @@ async def invite_users_to_event(request, pk):
                     appointment.status = "pending"
                     await sync_to_async(appointment.save)()
 
-                # Отправляем Telegram уведомление
                 if user.telegram_id:
                     try:
                         bot = await get_bot()
-
-                        # Уведомление о новом приглашении с деталями
                         await bot.send_message(
                             chat_id=user.telegram_id,
                             text=(
@@ -354,7 +332,6 @@ async def invite_users_to_event(request, pk):
                             reply_markup=appointment_action_keyboard(appointment.id)  # Клавиатура действий
                         )
 
-                        # Главное меню для навигации
                         await bot.send_message(
                             chat_id=user.telegram_id,
                             text="Для просмотра всех приглашений нажмите \"🔎 Статус приглашений\".",
@@ -371,7 +348,6 @@ async def invite_users_to_event(request, pk):
                 logger.error(f"Не удалось обработать пользователя {user.username}: {e}")
                 failed_invites.append(user.username)
 
-        # Отчёт по приглашениям
         if failed_invites:
             messages.warning(
                 request,
@@ -380,10 +356,8 @@ async def invite_users_to_event(request, pk):
         else:
             messages.success(request, "Все приглашения отправлены успешно.")
 
-        # Перенаправление на страницу встреч
         return redirect('user_appointments')  # Перенаправляет на /appointments/
 
-    # Генерация страницы (GET-запрос)
     return TemplateResponse(request, "pages/invite_users.html", {
         "event": event,
         "users": users,

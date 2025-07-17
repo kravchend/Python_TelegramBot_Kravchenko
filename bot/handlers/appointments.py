@@ -19,13 +19,11 @@ router = Router()
 
 @router.message(lambda message: message.text == "🔎 Статус приглашений")
 async def status_button_handler(message: types.Message):
-    """Обработчик нажатия кнопки статуса"""
     await display_status(message)
 
 
 @router.message(Command("status"))
 async def display_status(message: types.Message):
-    """Отображение статуса приглашений для пользователя"""
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
 
@@ -33,7 +31,6 @@ async def display_status(message: types.Message):
         await message.answer("Вы не зарегистрированы. Используйте /register.", reply_markup=main_keyboard())
         return
 
-    # Выборка приглашений через ORM
     invitee_appointments = await sync_to_async(lambda: list(
         Appointment.objects.filter(invitee_id=user_id).select_related('event', 'organizer')
     ))()
@@ -41,14 +38,12 @@ async def display_status(message: types.Message):
         Appointment.objects.filter(organizer_id=user_id).select_related('event', 'invitee')
     ))()
 
-    # Формирование текста статуса
     status_display = {
         "pending": "⏳ Ожидание подтверждения",
         "confirmed": "✅ Подтверждённое",
         "cancelled": "❌ Отклонённое"
     }
 
-    # Информация для участников
     for appt in invitee_appointments:
         event = appt.event
         organizer = appt.organizer
@@ -64,7 +59,6 @@ async def display_status(message: types.Message):
         else:
             await message.answer(text)
 
-    # Информация для организаторов
     if organizer_appointments:
         text = "🔹 **Как организатор:**\n"
         for appt in organizer_appointments:
@@ -83,7 +77,6 @@ async def display_status(message: types.Message):
 
 @router.callback_query(lambda cq: cq.data.startswith("invite_"))
 async def invite_user_callback(callback_query: types.CallbackQuery):
-    """Обработчик колбэка для приглашения пользователей"""
     data = callback_query.data
 
     if data == "invite_done":
@@ -169,7 +162,6 @@ async def appointment_action_callback(callback: types.CallbackQuery):
     logger.debug(f"Получен callback: {data}")
 
     try:
-        # Определение действия: подтверждение или отмена
         if data.startswith("appt_confirm_"):
             appointment_id = int(data.replace("appt_confirm_", ""))
             action = "confirmed"
@@ -183,23 +175,19 @@ async def appointment_action_callback(callback: types.CallbackQuery):
         else:
             raise ValueError("Некорректный формат данных.")
 
-        # Получение объекта встречи
         appointment = await sync_to_async(Appointment.objects.get)(id=appointment_id)
         invitee_telegram_id = await sync_to_async(lambda: appointment.invitee.telegram_id)()
 
-        # Проверка, что действие выполняется приглашённым пользователем
         if callback.from_user.id != invitee_telegram_id:
             await callback.answer("Только приглашённый может выполнить это действие.", show_alert=True)
             return
 
-        # Обновление статуса назначения
         def update_status():
             appointment.status = action
             appointment.save()
 
         await sync_to_async(update_status)()
 
-        # Уведомление организатора о действии участника
         organizer_telegram_id = await sync_to_async(lambda: appointment.organizer.telegram_id)()
         invitee_username = await sync_to_async(lambda: appointment.invitee.username)()
         event_name = await sync_to_async(lambda: appointment.event.name)()
@@ -216,11 +204,9 @@ async def appointment_action_callback(callback: types.CallbackQuery):
                     f"Ошибка отправки уведомления организатору (Telegram ID {organizer_telegram_id}): {e}"
                 )
 
-        # Уведомление участника о завершении действия
         await callback.message.edit_text(participant_action_text)
         await callback.answer(participant_action_text)
 
-    # Обработка ошибок
     except Appointment.DoesNotExist:
         await callback.answer("Встреча не найдена.", show_alert=True)
     except ValueError as e:
@@ -248,7 +234,6 @@ def get_appointment_by_id(app_id):
 
 @router.message(Command("invite"))
 async def command_invite_user(message: types.Message):
-    """Обработчик команды invite"""
     args = message.text.strip().split()
     if len(args) != 5:
         await message.answer(
