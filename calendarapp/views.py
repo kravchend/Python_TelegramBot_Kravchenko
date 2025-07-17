@@ -388,4 +388,3 @@ async def invite_users_to_event(request, pk):
         "event": event,
         "users": users,
     })
-

@@ -233,7 +233,6 @@ async def appointment_action_callback(callback: types.CallbackQuery):
         await callback.answer("Произошла ошибка. Попробуйте позже.", show_alert=True)
 
 
-
 @sync_to_async
 def update_appointment_status(app_id, new_status):
     appointment = Appointment.objects.get(pk=app_id)
