@@ -32,17 +32,62 @@ def custom_logout(request):
 
 
 def site_register_view(request):
-    if request.method == 'POST':
+    # Получаем данные из GET-запроса
+    username = request.GET.get("username", "")
+    telegram_id = request.GET.get("telegram_id", None)
+
+    # Логируем входные данные для проверки
+    logger.debug(f"Поступили данные username={username}, telegram_id={telegram_id}")
+
+    if request.method == "POST":
         form = SiteRegistrationForm(request.POST)
+
         if form.is_valid():
-            user = form.save(commit=False)
-            user.set_password(form.cleaned_data['password'])
-            user.save()
-            login(request, user)
-            return redirect('home')
+            username = form.cleaned_data["username"]
+            password = form.cleaned_data["password"]
+
+            # Проверяем существующего пользователя с username или telegram_id
+            user_query = User.objects.filter(username=username)
+            if telegram_id:
+                user_query = user_query.filter(telegram_id=telegram_id)
+
+            user = user_query.first()
+
+            if user:
+                if user.has_usable_password():
+                    # Если пароль уже установлен, предлагаем авторизоваться
+                    messages.error(request, "Этот пользователь уже зарегистрирован! Войдите в систему.")
+                    return render(request, "registration/register.html", {"form": form})
+
+                # Если у пользователя ещё нет пароля - устанавливаем
+                user.set_password(password)
+                user.save()
+                login(request, user)  # Авторизация пользователя
+                messages.success(request, "Вы успешно завершили регистрацию!")
+                return redirect("home")
+            else:
+                # Если пользователя с username/telegram_id не существует - создаём
+                logger.debug("Создаем нового пользователя...")
+                user = form.save(commit=False)
+                user.set_password(password)
+                user.telegram_id = telegram_id
+                user.save()
+                login(request, user)
+                messages.success(request, "Регистрация прошла успешно!")
+                return redirect("home")
+
+        else:
+            # Форма не валидна
+            logger.warning(f"Ошибки в форме регистрации: {form.errors}")
+            messages.error(request, "Ошибка при регистрации. Проверьте указанные данные.")
     else:
-        form = SiteRegistrationForm()
-    return render(request, 'registration/register.html', {'form': form})
+        # Подготовка начальной формы с начальными данными
+        initial_data = {"username": username or "", "telegram_id": telegram_id or ""}
+        form = SiteRegistrationForm(initial=initial_data)
+
+    # Генерируем форму регистрации
+    return render(request, "registration/register.html", {"form": form})
+
 
 
 @login_required
@@ -153,20 +198,38 @@ def event_delete(request, pk):
 
 @login_required
 def calendar_view(request):
-    user = get_object_or_404(User, username=request.user.username)
+    # Получаем авторизованного пользователя
+    user = request.user  # Это всегда текущий авторизованный пользователь
+
+    # Получение текущего месяца и года
     now = datetime.now()
     month = int(request.GET.get("month", now.month))
     year = int(request.GET.get("year", now.year))
-    events = Event.objects.filter(user=user, date__year=year, date__month=month).order_by('date', 'time')
 
+    # Фильтруем только доступные события пользователя:
+    # - События созданы пользователем
+    # - Пользователь подтвержден как приглашенный на событие
+    # - Публичные события
+    events = Event.objects.filter(
+        Q(user=user) |
+        Q(is_public=True) |
+        Q(appointment__invitee=user, appointment__status="confirmed"),
+        date__year=year,
+        date__month=month
+    ).distinct().order_by('date', 'time')  # distinct для избежания дублирования
+
+    # Отладочная информация
     print(f"Found {events.count()} events for user '{user.username}' in {year}-{month}.")
     for event in events:
         print(f"Event: {event.name} on {event.date}")
 
-    event_days = set(e.date.day for e in events)
-    html_calendar, cal_year, cal_month = calendar.render_for_template(year=year, month=month, event_days=event_days)
-    print(f"HTML Calendar: {html_calendar[:500]}")
+    # Генерация календаря для отображения
+    event_days = set(e.date.day for e in events)  # Дни с событиями
+    html_calendar, cal_year, cal_month = calendar.render_for_template(
+        year=year, month=month, event_days=event_days
+    )
 
+    # Рендер страницы календаря
     return render(request, 'pages/calendar.html', {
         'events': events,
         'html_calendar': html_calendar,
@@ -271,11 +334,18 @@ def export_events_csv(request):
 
 @login_required
 def event_detail(request, pk):
-    event = get_object_or_404(Event, pk=pk, user=request.user)
+    # Фильтруем только доступные события
+    event = get_object_or_404(
+        Event,  # Передаем саму модель
+        Q(id=pk) & (Q(user=request.user) | Q(appointment__invitee=request.user)),  # Условия доступа
+    )
+
+    # Вычисляем пользователей, которых можно пригласить (исключая текущего пользователя и уже приглашенных)
     invitable_users = User.objects.exclude(id=request.user.id).exclude(
         id__in=Appointment.objects.filter(event=event).values_list('invitee_id', flat=True)
     )
 
+    # Пользователи, которые уже приглашены
     invited_users = Appointment.objects.filter(event=event).select_related('invitee')
 
     return render(request, 'pages/event_detail.html', {

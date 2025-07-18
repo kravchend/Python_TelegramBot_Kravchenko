@@ -1,4 +1,6 @@
 from aiogram import F, Router, types
+from django.db.models import Q
+
 from bot.calendar_instance import calendar
 from aiogram.filters import Command
 from bot.handlers.keyboards import (
@@ -315,15 +317,31 @@ async def user_calendar_handler(message: types.Message):
             reply_markup=main_keyboard()
         )
         return
-    events = await calendar.get_all_events(user_id)
+
+    # Получаем только доступные события пользователя
+    events = await sync_to_async(lambda: list(
+        Event.objects.filter(
+            Q(user_id=user_id) | Q(appointment__invitee_id=user_id) | Q(is_public=True)  # Условия доступа
+        ).order_by('date', 'time')
+    ))()
+
     if not events:
-        await message.answer("У вас нет событий.", reply_markup=main_keyboard())
+        await message.answer("У вас нет доступных событий.", reply_markup=main_keyboard())
         return
+
+    # Генерация ссылок
     lines = [
-        f"{e['id']}: {e['name']} | {e['date']} {e['time']} — {e['details']}"
-        for e in events
+        f"{e.id}: {e.name} | {e.date} {e.time} — {e.details}" for e in events
     ]
-    await message.answer("Ваш календарь: \n" + "\n".join(lines), reply_markup=main_keyboard())
+    calendar_url = f"http://127.0.0.1:8000/calendar/?user_id={user_id}"  # Передаем user_id
+
+    await message.answer(
+        "Ваш календарь:\n" + "\n".join(lines) + f"\n\n🔗 <a href='{calendar_url}'>Открыть календарь</a>",
+        reply_markup=main_keyboard(),
+        parse_mode="HTML"
+    )
+
+
 
 
 @router.message(F.text == "📆 Календарь")
