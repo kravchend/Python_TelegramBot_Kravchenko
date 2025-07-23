@@ -8,7 +8,7 @@ from bot.handlers.keyboards import (
 from asgiref.sync import sync_to_async
 from datetime import datetime
 from bot.handlers.types import DummyEvent
-from .calendar_states import calendar_creation_state, calendar_edit_state
+from .calendar_states import calendar_edit_state
 from calendarapp.models import User, Event
 from bot.handlers.users import get_bot
 
@@ -149,24 +149,6 @@ async def make_public_handler(message: types.Message):
 @router.message(F.text == "🌍 Общие события")
 async def show_public_events_for_user(message: types.Message):
     await list_user_public_events_handler(message)
-
-
-@router.message(F.text == "📆 Календарь: создать событие")
-async def button_create_calendar_event(message: types.Message):
-    telegram_id = message.from_user.id
-    user_id = await calendar.get_user_db_id(telegram_id)
-    if not user_id:
-        await message.answer(
-            "Вы не зарегистрированы. Используйте /register",
-            reply_markup=main_keyboard()
-        )
-        return
-
-    calendar_creation_state[telegram_id] = {"step": "name"}
-    await message.answer(
-        "Введите название события:",
-        reply_markup=types.ReplyKeyboardRemove()
-    )
 
 
 @router.callback_query(lambda cq: cq.data.startswith("invite_event_"))
@@ -349,6 +331,7 @@ async def show_calendar_month(message: types.Message):
 
 @router.message(Command("invite"))
 async def command_invite_user(message: types.Message):
+    print("invite command in event.py")
     args = message.text.strip().split()
     if len(args) != 5:
         await message.answer(

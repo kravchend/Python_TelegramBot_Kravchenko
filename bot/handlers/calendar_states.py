@@ -20,94 +20,6 @@ def log_func(func):
     return wrapper
 
 
-@router.message(F.text == "📆 Календарь: изменить событие")
-@log_func
-async def handle_edit_event_button(message: types.Message, **kwargs):
-    await button_edit_calendar_event(message, **kwargs)
-
-
-@router.message(lambda message: calendar_creation_state.get(message.from_user.id) is not None)
-@log_func
-async def process_calendar_creation(message: types.Message, **kwargs):
-    from bot.handlers.events import render_event_message
-    telegram_id = message.from_user.id
-    user_id = await calendar.get_user_db_id(telegram_id)
-    if not user_id:
-        await message.answer(
-            "Вы не зарегистрированы. Используйте /register",
-            reply_markup=main_keyboard()
-        )
-        return
-
-    state = calendar_creation_state.get(telegram_id)
-    if not state:
-        return
-
-    step = state["step"]
-    if step == "name":
-        state["name"] = message.text.strip()
-        state["step"] = "details"
-        await message.answer("Введите описание события:")
-    elif step == "details":
-        state["details"] = message.text.strip()
-        state["step"] = "date"
-        await message.answer("Введите дату события (ГГГГ-ММ-ДД):")
-    elif step == "date":
-        state["date"] = message.text.strip()
-        state["step"] = "time"
-        await message.answer("Введите время события (ЧЧ:ММ): ")
-    elif step == "time":
-        state["time"] = message.text.strip()
-        try:
-            datetime.strptime(state["date"], "%Y-%m-%d")
-            try:
-                _time_obj = datetime.strptime(state["time"], "%H:%M")
-            except ValueError:
-                _time_obj = datetime.strptime(state["time"], "%H:%M:%S")
-            state["time"] = _time_obj.strftime("%H:%M:%S")
-            event_id = await calendar.create_event(
-                user_id, state["name"], state["date"], state["time"], state["details"]
-            )
-            if not event_id:
-                await message.answer("Ошибка: не удалось создать событие!", reply_markup=main_keyboard())
-            else:
-                events = await calendar.get_all_events(user_id)
-                my_idx, my_event = None, None
-                for idx, event in enumerate(events, 1):
-                    if str(event.get("id", event.get("order"))) == str(event_id):
-                        my_idx = idx
-                        my_event = event
-                        break
-                if my_idx is None:
-                    await message.answer("Ошибка: не удалось найти только что созданное событие!")
-                else:
-                    time_str = str(my_event["time"])
-                    try:
-                        time_val = datetime.strptime(time_str, '%H:%M:%S')
-                    except ValueError:
-                        time_val = datetime.strptime(time_str, '%H:%M')
-                    ev = DummyEvent(
-                        id=str(my_event.get("id", my_event.get("order"))),
-                        name=str(my_event["name"]),
-                        details=str(my_event["details"]),
-                        date=datetime.strptime(str(my_event["date"]), '%Y-%m-%d'),
-                        time=time_val,
-                        is_public=bool(my_event.get("is_public", False))
-                    )
-                    text, keyboard = render_event_message(ev)
-                    await message.answer(text, reply_markup=keyboard)
-                    await message.answer(
-                        "Вы можете пригласить участников на это событие:",
-                        reply_markup=get_invite_keyboard(event_id)
-                    )
-        except Exception as e:
-            await message.answer(
-                f"Ошибка в данных события: {e}",
-                reply_markup=main_keyboard()
-            )
-            calendar_creation_state.pop(telegram_id, None)
-
-
 @router.message(F.text == "📆 Календарь: создать событие")
 @router.message(Command("calendar_create"))
 @log_func
@@ -122,6 +34,90 @@ async def calendar_create_handler(message: types.Message, **kwargs):
         return
     calendar_creation_state[telegram_id] = {"step": "name"}
     await message.answer("Введите название события:")
+
+
+@router.message(lambda message: calendar_creation_state.get(message.from_user.id) is not None)
+@log_func
+async def process_calendar_creation(message: types.Message, **kwargs):
+    from bot.handlers.events import render_event_message
+    telegram_id = message.from_user.id
+    state = calendar_creation_state.get(telegram_id)
+    if not state:
+        return
+
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer(
+            "Вы не зарегистрированы.\n Используйте /register \n или зарегестрируйтесь на сайте",
+            reply_markup=main_keyboard()
+        )
+        return
+
+    try:
+        step = state["step"]
+
+        if step == "name":
+            state["name"] = message.text.strip()
+            state["step"] = "details"
+            await message.answer("Введите описание события:")
+            return
+
+        if step == "details":
+            state["details"] = message.text.strip()
+            state["step"] = "date"
+            await message.answer("Введите дату события (ГГГГ-ММ-ДД):")
+            return
+
+        if step == "date":
+            datetime.strptime(message.text.strip(), "%Y-%m-%d")  # Валидация
+            state["date"] = message.text.strip()
+            state["step"] = "time"
+            await message.answer("Введите время события (ЧЧ:ММ):")
+            return
+
+        if step == "time":
+            try:
+                time_obj = datetime.strptime(message.text.strip(), "%H:%M")
+            except ValueError:
+                await message.answer("Неверный формат времени. Используйте ЧЧ:ММ")
+                return
+
+            state["time"] = time_obj.strftime("%H:%M:%S")
+            event_id = await calendar.create_event(
+                user_id, state["name"], state["date"], state["time"], state["details"]
+            )
+
+            if not event_id:
+                await message.answer("Ошибка при создании события.", reply_markup=main_keyboard())
+                calendar_creation_state.pop(telegram_id, None)
+                return
+
+            from bot.handlers.events import get_user_events_with_index
+            events = await get_user_events_with_index(user_id)
+            my_event = next((e for e in events if str(e.get("id")) == str(event_id)), None)
+
+            if not my_event:
+                await message.answer("Событие создано, но не удалось отобразить его.", reply_markup=main_keyboard())
+            else:
+                text, keyboard = render_event_message(DummyEvent(
+                    id=str(my_event["id"]),
+                    name=my_event["name"],
+                    details=my_event["details"],
+                    date=datetime.strptime(my_event["date"], "%Y-%m-%d"),
+                    time=datetime.strptime(my_event["time"], "%H:%M:%S"),
+                    is_public=bool(my_event.get("is_public", False)),
+                ))
+                await message.answer(text, reply_markup=keyboard)
+                await message.answer(
+                    "Вы можете пригласить участников:",
+                    reply_markup=get_invite_keyboard(event_id)
+                )
+
+            calendar_creation_state.pop(telegram_id, None)
+
+    except Exception as e:
+        await message.answer(f"Ошибка: {e}", reply_markup=main_keyboard())
+        calendar_creation_state.pop(telegram_id, None)
 
 
 @router.message(lambda message: calendar_edit_state.get(message.from_user.id) is not None)
