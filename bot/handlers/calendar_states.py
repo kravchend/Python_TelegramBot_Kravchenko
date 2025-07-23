@@ -13,6 +13,7 @@ calendar_edit_state = {}
 
 def log_func(func):
     async def wrapper(*args, **kwargs):
+        print(f"[LOG] Вызов функции: {func.__name__}")
         return await func(*args, **kwargs)
 
     return wrapper
@@ -178,7 +179,6 @@ async def calendar_delete_handler(message: types.Message, **kwargs):
         await message.answer("Используй: /calendar_delete <номер>", reply_markup=main_keyboard())
         return
     try:
-        # Получаем список событий с нужной сортировкой и индексами
         events = await get_user_events_with_index(user_id)
         num = int(args[1])
         if not (1 <= num <= len(events)):
@@ -304,6 +304,7 @@ async def button_edit_calendar_event(message: types.Message, **kwargs):
         "events": events,
         "step": "num"
     }
+
     await message.answer(
         "Введите номер события для редактирования:\n" + "\n".join(lines),
         reply_markup=types.ReplyKeyboardRemove()

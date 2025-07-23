@@ -34,6 +34,7 @@ async def display_status(message: types.Message):
     invitee_appointments = await sync_to_async(lambda: list(
         Appointment.objects.filter(invitee_id=user_id).select_related('event', 'organizer')
     ))()
+
     organizer_appointments = await sync_to_async(lambda: list(
         Appointment.objects.filter(organizer_id=user_id).select_related('event', 'invitee')
     ))()

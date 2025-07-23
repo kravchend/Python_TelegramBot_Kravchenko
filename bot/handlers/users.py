@@ -20,35 +20,29 @@ async def get_bot():
 
 @router.message(Command("start"))
 async def send_welcome(message: types.Message):
-    telegram_id = message.from_user.id  # ID текущего пользователя Telegram
+    telegram_id = message.from_user.id
     username = message.from_user.username or f"User_{telegram_id}"
+    password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
 
-    # Генерация случайного пароля
-    password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))  # 12 символов: буквы и цифры
-
-    base_register_url = "http://127.0.0.1:8000/register"  # Базовый URL вашей регистрации на сайте
+    base_register_url = "http://127.0.0.1:8000/register"
 
     try:
-        # Создаём пользователя или проверяем наличие
         user, created = await sync_to_async(User.objects.get_or_create)(
             telegram_id=telegram_id,
             defaults={
                 'username': username,
-                'email': f"{username}@telegram.bot",  # Технический email
-                'is_active': True  # Активируем пользователя
+                'email': f"{username}@telegram.bot",
+                'is_active': True
             }
         )
 
         if created:
-            # Устанавливаем сгенерированный пароль
             user.set_password(password)
-            await sync_to_async(user.save)()  # Сохраняем пользователя с паролем
-
-            # Отправляем пользователю его сгенерированный пароль
+            await sync_to_async(user.save)()
             await message.answer(
                 f"Здравствуйте, {username}! Вы успешно зарегистрированы.\n\n"
                 f"Ваши данные для входа на сайт:\n"
-                f"🌐 **Сайт:** http://127.0.0.1:8000\n"
+                f"🌐 **Сайт:** http://127.0.0.1:8000/register\n"
                 f"👤 **Имя пользователя (username):** `{username}`\n"
                 f"🔑 **Пароль:** `{password}`\n\n"
                 f"Вы можете использовать эти данные для входа на сайт.",
@@ -56,7 +50,6 @@ async def send_welcome(message: types.Message):
                 parse_mode="Markdown"
             )
         else:
-            # Если пользователь уже зарегистрирован через бота
             await message.answer(
                 "Здравствуйте! Вы уже зарегистрированы. Добро пожаловать!",
                 reply_markup=main_keyboard()
