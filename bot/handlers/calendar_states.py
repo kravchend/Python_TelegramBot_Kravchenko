@@ -4,6 +4,7 @@ from bot.handlers.keyboards import main_keyboard, get_invite_keyboard
 from bot.calendar_instance import calendar
 from datetime import datetime
 from bot.handlers.types import DummyEvent
+
 router = Router()
 
 calendar_creation_state = {}
@@ -23,12 +24,6 @@ def log_func(func):
 @log_func
 async def handle_edit_event_button(message: types.Message, **kwargs):
     await button_edit_calendar_event(message, **kwargs)
-
-
-@router.message(F.text == "📆 Календарь: удалить событие")
-@log_func
-async def handle_delete_event_button(message: types.Message, **kwargs):
-    await button_delete_calendar_event(message, **kwargs)
 
 
 @router.message(lambda message: calendar_creation_state.get(message.from_user.id) is not None)
@@ -107,9 +102,9 @@ async def process_calendar_creation(message: types.Message, **kwargs):
                     )
         except Exception as e:
             await message.answer(
-                    f"Ошибка в данных события: {e}",
-                    reply_markup=main_keyboard()
-                )
+                f"Ошибка в данных события: {e}",
+                reply_markup=main_keyboard()
+            )
             calendar_creation_state.pop(telegram_id, None)
 
 
@@ -127,71 +122,6 @@ async def calendar_create_handler(message: types.Message, **kwargs):
         return
     calendar_creation_state[telegram_id] = {"step": "name"}
     await message.answer("Введите название события:")
-
-
-@router.message(lambda message: calendar_delete_state.get(message.from_user.id) is not None)
-@log_func
-async def process_calendar_deletion(message: types.Message, **kwargs):
-    telegram_id = message.from_user.id
-    user_id = await calendar.get_user_db_id(telegram_id)
-    events = calendar_delete_state.get(telegram_id)
-    if not user_id or telegram_id not in calendar_delete_state:
-        await message.answer(
-            "Вы не зарегистрированы. Используйте /register",
-            reply_markup=main_keyboard()
-        )
-        return
-    if not events:
-        await message.answer("Нет доступных событий.")
-        return
-    try:
-        num = int(message.text.strip())
-        if not (1 <= num <= len(events)):
-            raise ValueError
-        event_item = events[num - 1]
-        event_id = event_item["id"] if isinstance(event_item, dict) else event_item.id
-        result = await calendar.delete_event(user_id, event_id)
-        if result:
-            await message.answer("Событие удалено.", reply_markup=main_keyboard())
-        else:
-            await message.answer("Событие не найдено.", reply_markup=main_keyboard())
-        calendar_delete_state.pop(telegram_id, None)
-    except Exception as e:
-        await message.answer(f"Некорректный номер.")
-
-
-@router.message(F.text == "📆 Календарь: удалить событие")
-@router.message(Command("calendar_delete"))
-@log_func
-async def calendar_delete_handler(message: types.Message, **kwargs):
-    from bot.handlers.events import get_user_events_with_index
-    telegram_id = message.from_user.id
-    user_id = await calendar.get_user_db_id(telegram_id)
-    if not user_id:
-        await message.answer(
-            "Вы не зарегистрированы. Используйте /register",
-            reply_markup=main_keyboard()
-        )
-        return
-
-    args = message.text.strip().split()
-    if len(args) != 2:
-        await message.answer("Используй: /calendar_delete <номер>", reply_markup=main_keyboard())
-        return
-    try:
-        events = await get_user_events_with_index(user_id)
-        num = int(args[1])
-        if not (1 <= num <= len(events)):
-            await message.answer("Некорректный номер. Попробуйте снова.", reply_markup=main_keyboard())
-            return
-        event_id = str(events[num - 1]["id"])  # <-- вот тут как нужно!
-        result = await calendar.delete_event(user_id, event_id)
-        if result:
-            await message.answer("Событие удалено.", reply_markup=main_keyboard())
-        else:
-            await message.answer("Событие не найдено.", reply_markup=main_keyboard())
-    except Exception:
-        await message.answer("Ошибка. Проверьте номер.", reply_markup=main_keyboard())
 
 
 @router.message(lambda message: calendar_edit_state.get(message.from_user.id) is not None)
@@ -260,27 +190,6 @@ async def process_calendar_editing_by_number(message: types.Message, **kwargs):
         calendar_edit_state.pop(telegram_id, None)
 
 
-@router.message(F.text == "📆 Календарь: удалить событие")
-@log_func
-async def button_delete_calendar_event(message: types.Message, **kwargs):
-    from bot.handlers.events import get_user_events_with_index
-    telegram_id = message.from_user.id
-    user_id = await calendar.get_user_db_id(telegram_id)
-    events = await get_user_events_with_index(user_id)
-    if not user_id:
-        await message.answer(
-            "Вы не зарегистрированы. Используйте /register",
-            reply_markup=main_keyboard()
-        )
-        return
-    if not events:
-        await message.answer("У вас нет событий для удаления.", reply_markup=main_keyboard())
-        return
-    calendar_delete_state[telegram_id] = events
-    text = "\n".join(f"{i + 1}. {e['name']} {e['date']} {e['time']}" for i, e in enumerate(events))
-    await message.answer("Ваши события:\n" + text + "\n\nОтправьте номер события для удаления.")
-
-
 @router.message(F.text == "📆 Календарь: изменить событие")
 @log_func
 async def button_edit_calendar_event(message: types.Message, **kwargs):
@@ -309,3 +218,56 @@ async def button_edit_calendar_event(message: types.Message, **kwargs):
         "Введите номер события для редактирования:\n" + "\n".join(lines),
         reply_markup=types.ReplyKeyboardRemove()
     )
+
+
+# @router.message(Command("calendar_delete"))
+@router.message(F.text == "📆 Календарь: удалить событие")
+@log_func
+async def button_delete_calendar_event(message: types.Message, **kwargs):
+    from bot.handlers.events import get_user_events_with_index
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    events = await get_user_events_with_index(user_id)
+    if not user_id:
+        await message.answer(
+            "Вы не зарегистрированы. Используйте /register",
+            reply_markup=main_keyboard()
+        )
+        return
+    if not events:
+        await message.answer("У вас нет событий для удаления.", reply_markup=main_keyboard())
+        return
+    calendar_delete_state[telegram_id] = events
+    text = "\n".join(f"{i + 1}. {e['name']} {e['date']} {e['time']}" for i, e in enumerate(events))
+    await message.answer("Ваши события:\n" + text + "\n\nОтправьте номер события для удаления.")
+
+
+@router.message(lambda message: calendar_delete_state.get(message.from_user.id) is not None)
+@log_func
+async def process_calendar_deletion(message: types.Message, **kwargs):
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    events = calendar_delete_state.get(telegram_id)
+    if not user_id or telegram_id not in calendar_delete_state:
+        await message.answer(
+            "Вы не зарегистрированы. Используйте /register",
+            reply_markup=main_keyboard()
+        )
+        return
+    if not events:
+        await message.answer("Нет доступных событий.")
+        return
+    try:
+        num = int(message.text.strip())
+        if not (1 <= num <= len(events)):
+            raise ValueError
+        event_item = events[num - 1]
+        event_id = event_item["id"] if isinstance(event_item, dict) else event_item.id
+        result = await calendar.delete_event(user_id, event_id)
+        if result:
+            await message.answer("Событие удалено.", reply_markup=main_keyboard())
+        else:
+            await message.answer("Событие не найдено.", reply_markup=main_keyboard())
+        calendar_delete_state.pop(telegram_id, None)
+    except Exception as e:
+        await message.answer(f"Некорректный номер.")
