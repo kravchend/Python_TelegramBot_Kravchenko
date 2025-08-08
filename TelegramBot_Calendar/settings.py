@@ -137,3 +137,6 @@ APPLE_TOUCH_ICON_PATH = '/static/icons/apple-touch-icon.png'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = '/home/'  # Вместо страницы входа перенаправляем на /home/
+LOGIN_REDIRECT_URL = '/home/'  # После успешного входа направляем на главную

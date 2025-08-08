@@ -326,7 +326,7 @@ async def user_calendar_handler(message: types.Message):
 async def show_calendar_month(message: types.Message):
     html_calendar, year, month = calendar.render_for_template()
     txt = f"Календарь за {month:02}.{year}:\n\n"
-    await message.answer(txt + "(Открыть календарь на сайте: http://127.0.0.1:8000/calendar/)")
+    await message.answer(txt + "(Открыть календарь на сайте: http://127.0.0.1:8000/home/)\n")
 
 
 @router.message(Command("invite"))

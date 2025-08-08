@@ -49,9 +49,9 @@ async def display_status(message: types.Message):
         event = appt.event
         organizer = appt.organizer
         text = (
-            f"Событие: {event.name}\n"
-            f"Дата: {event.date} {event.time}\n"
             f"Организатор: {organizer.username}\n"
+            f"Событие: {event.name}\n"
+            f"🗓️ Дата: {event.date} {event.time}\n"
             f"Статус: {status_display.get(appt.status, '❓ Неизвестно')}"
         )
         if appt.status == "pending":
@@ -61,13 +61,13 @@ async def display_status(message: types.Message):
             await message.answer(text)
 
     if organizer_appointments:
-        text = "🔹 **Как организатор:**\n"
+        text = "🔹🔹🔹Вы организатор 🔹🔹🔹\n"
         for appt in organizer_appointments:
             event = appt.event
             invitee = appt.invitee
             text += (
                 f"Событие: {event.name} | Дата: {event.date} {event.time}\n"
-                f"Участник: {invitee.username}\n"
+                f"🔹Участник: {invitee.username}\n"
                 f"Статус: {status_display.get(appt.status, '❓ Неизвестно')}\n\n"
             )
         await message.answer(text, reply_markup=main_keyboard())
@@ -140,9 +140,11 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
 
         users = await get_invitable_users(event_id=event_id, exclude_user_id=organizer_tg_id)
         if not users:
-            await callback_query.message.edit_text(
+            await callback_query.message.answer(
                 "Все пользователи приглашены! Спасибо.",
+                reply_markup=main_keyboard(),
             )
+
         else:
             keyboard = get_users_invite_keyboard(event.id, users)
             await callback_query.message.edit_text(

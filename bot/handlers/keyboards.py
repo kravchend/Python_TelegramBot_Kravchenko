@@ -11,12 +11,12 @@ def main_keyboard():
             types.KeyboardButton(text="🔎 Статус приглашений"),
         ],
         [
-            types.KeyboardButton(text="📆 Календарь: создать событие"),
-            types.KeyboardButton(text="📅 Календарь: список событий"),
+            types.KeyboardButton(text="📝 Создать событие"),
+            types.KeyboardButton(text="📋 Список событий"),
         ],
         [
-            types.KeyboardButton(text="📆 Календарь: изменить событие"),
-            types.KeyboardButton(text="📆 Календарь: удалить событие"),
+            types.KeyboardButton(text="🔑 Изменить событие"),
+            types.KeyboardButton(text="🗑️ Удалить событие"),
         ],
         [
             types.KeyboardButton(text="🌍 Общие события"),
