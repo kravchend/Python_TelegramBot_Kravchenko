@@ -20,7 +20,7 @@ def log_func(func):
     return wrapper
 
 
-@router.message(F.text == "📆 Календарь: создать событие")
+@router.message(F.text == "📝 Создать событие")
 @router.message(Command("calendar_create"))
 @log_func
 async def calendar_create_handler(message: types.Message, **kwargs):
@@ -186,7 +186,7 @@ async def process_calendar_editing_by_number(message: types.Message, **kwargs):
         calendar_edit_state.pop(telegram_id, None)
 
 
-@router.message(F.text == "📆 Календарь: изменить событие")
+@router.message(F.text == "🔑 Изменить событие")
 @log_func
 async def button_edit_calendar_event(message: types.Message, **kwargs):
     from bot.handlers.events import get_user_events_with_index
@@ -217,7 +217,7 @@ async def button_edit_calendar_event(message: types.Message, **kwargs):
 
 
 # @router.message(Command("calendar_delete"))
-@router.message(F.text == "📆 Календарь: удалить событие")
+@router.message(F.text == "🗑️ Удалить событие")
 @log_func
 async def button_delete_calendar_event(message: types.Message, **kwargs):
     from bot.handlers.events import get_user_events_with_index

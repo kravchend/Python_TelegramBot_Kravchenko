@@ -162,7 +162,7 @@ async def invite_event_start_callback(callback: types.CallbackQuery):
     )
 
 
-@router.message(F.text == "📅 Календарь: список событий")
+@router.message(F.text == "📋 Список событий")
 async def button_list_calendar_events(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
