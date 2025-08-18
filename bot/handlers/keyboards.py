@@ -7,13 +7,13 @@ from asgiref.sync import sync_to_async
 def main_keyboard():
     keyboard = [
         [
-            types.KeyboardButton(text="📝 Создать событие"),
+            types.KeyboardButton(text="📝 Начать"),
             types.KeyboardButton(text="📋 Список событий"),
             types.KeyboardButton(text="📆 Календарь"),
             # types.KeyboardButton(text="🔎 Статус приглашений"),
         ],
         # [
-        #     types.KeyboardButton(text="📝 Создать событие"),
+        #     types.KeyboardButton(text="📝 Начать"),
         #     types.KeyboardButton(text="📋 Список событий"),
         # ],
         [
@@ -79,11 +79,13 @@ async def get_invitable_users(event_id, exclude_user_id):
 def event_public_action_keyboard(event_id, is_public):
     if is_public:
         return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔒 Сделать приватным", callback_data=f"event_private_{event_id}")]
+            [InlineKeyboardButton(text="🔒 Сделать приватным", callback_data=f"event_private_{event_id}")],
+            [InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")]
         ])
     else:
         return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🌐 Сделать публичным", callback_data=f"event_public_{event_id}")]
+            [InlineKeyboardButton(text="🌐 Сделать публичным", callback_data=f"event_public_{event_id}")],
+            [InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")]
         ])
 
 

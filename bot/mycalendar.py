@@ -55,13 +55,13 @@ class Calendar:
                 defaults={'username': username}
             )
             if created:
-                logger.info(f"User {telegram_id} зарегистрирован")
+                logger.info(f"🎉 {telegram_id} зарегистрирован!")
                 await self._increment_stat('user_count')
             else:
-                logger.info(f"User {telegram_id} уже зарегистрирован")
+                logger.info(f"🙂 {telegram_id} уже зарегистрирован!")
             return True
         except Exception as e:
-            logger.error(f"Ошибка регистрации пользователя {telegram_id}: {e}")
+            logger.error(f"❌ Ошибка регистрации пользователя {telegram_id}: {e}")
             return False
 
     async def is_registered(self, telegram_id):

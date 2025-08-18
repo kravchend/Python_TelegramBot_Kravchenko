@@ -50,7 +50,7 @@ async def send_welcome(message: types.Message):
             )
         else:
             await message.answer(
-                f"✨{username}, добро пожаловать! ✨👋👋👋",
+                f"✨👤 {username}, добро пожаловать!",
                 reply_markup=main_keyboard()
             )
 
