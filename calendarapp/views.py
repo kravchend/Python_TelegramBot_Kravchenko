@@ -369,38 +369,32 @@ async def invite_users_to_event(request, pk):
                         await bot.send_message(
                             chat_id=user.telegram_id,
                             text=(
-                                f"📩 **Вы приглашены на событие!**\n\n"
-                                f"📅 Событие: {event.name}\n"
-                                f"🕒 Дата и время: {event.date}, {event.time}\n\n"
-                                f"💬 Детали: {event.details or 'Не указаны'}\n\n"
-                                f"Вы можете подтвердить или отклонить приглашение по ссылке ниже:"
+                                f"😎📩\nНовое приглашение!\n\n"
+                                f"📌 {event.name}\n"
+                                f"🕒 {event.date} ({event.time:%H:%M})\n"
+                                f"💎 {event.details or 'Не указаны'}\n\n"
                             ),
                             reply_markup=appointment_action_keyboard(appointment.id)
                         )
 
-                        await bot.send_message(
-                            chat_id=user.telegram_id,
-                            text="Для просмотра всех приглашений нажмите \"🔎 Статус приглашений\".",
-                            reply_markup=main_keyboard()
-                        )
                         delivered_invites.append(user.username)
                     except TelegramBadRequest as e:
-                        logger.error(f"Ошибка доставки сообщения {user.username}: {e}")
+                        logger.error(f"❌Ошибка доставки сообщения {user.username}: {e}")
                         failed_invites.append(user.username)
                 else:
                     failed_invites.append(user.username)
 
             except Exception as e:
-                logger.error(f"Не удалось обработать пользователя {user.username}: {e}")
+                logger.error(f"❌ Не удалось обработать пользователя {user.username}: {e}")
                 failed_invites.append(user.username)
 
         if failed_invites:
             messages.warning(
                 request,
-                f"Часть приглашений успешно отправлена, но возникли проблемы с пользователями: {', '.join(failed_invites)}"
+                f"⚠️🚀 Часть приглашений отправлена,\nно возникли проблемы с пользователями:\n{', '.join(failed_invites)}"
             )
         else:
-            messages.success(request, "Все приглашения отправлены успешно.")
+            messages.success(request, "🚀💫 Все приглашения отправлены!")
 
         return redirect('user_appointments')
 

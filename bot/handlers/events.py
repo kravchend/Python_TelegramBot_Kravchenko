@@ -3,7 +3,9 @@ from django.db.models import Q
 from bot.calendar_instance import calendar
 from aiogram.filters import Command
 from bot.handlers.keyboards import (
-    main_keyboard, get_invite_keyboard, event_public_action_keyboard, get_users_invite_keyboard, get_invitable_users)
+    main_keyboard, get_invite_keyboard,
+    event_public_action_keyboard,
+    get_users_invite_keyboard, get_invitable_users)
 from asgiref.sync import sync_to_async
 from datetime import datetime
 from bot.handlers.types import DummyEvent
@@ -80,40 +82,6 @@ async def list_all_public_events_handler(message: types.Message):
         await message.answer(text)
 
 
-@router.message(Command("public_events"))
-async def list_user_public_events_handler(message: types.Message):
-    args = ""
-    if message.text:
-        args = message.text.partition(' ')[2].strip()
-    if args.startswith('@'):
-        try:
-            target_user = await sync_to_async(User.objects.get)(username=args[1:])
-        except User.DoesNotExist:
-            await message.answer("Пользователь не найден.")
-            return
-    elif args.isdigit():
-        try:
-            target_user = await sync_to_async(User.objects.get)(id=int(args))
-        except User.DoesNotExist:
-            await message.answer("Пользователь не найден.")
-            return
-    else:
-        await message.answer("Укажите пользователя: (/public_events @username или /public_events user_id)")
-        return
-
-    events = Event.objects.filter(user=target_user, is_public=True)
-    if events.exists():
-        text = f"Публичные события пользователя {target_user.username}:\n"
-        for event in events:
-            text += (
-                f"\n— {event.name}, {event.date.strftime('%d.%m.%Y')} в {event.time.strftime('%H:%M')}\n"
-                f"{event.details}\n"
-            )
-        await message.answer(text)
-    else:
-        await message.answer("Нет общедоступных событий у этого пользователя.")
-
-
 @router.message(Command("make_public"))
 async def make_public_handler(message: types.Message):
     args = ""
@@ -147,9 +115,59 @@ async def make_public_handler(message: types.Message):
             "Не удалось! (Возможно, уже публичное)")
 
 
-@router.message(F.text == "🌍 Общие события")
+##### Общие сообытия: "🧑‍🤝‍🧑 Общие" / "/public_events" #####
+@router.message(F.text == "🧑‍🤝‍🧑 Общие")
 async def show_public_events_for_user(message: types.Message):
-    await list_user_public_events_handler(message)
+    from calendarapp.models import Appointment
+    telegram_id = message.from_user.id
+    user_id = await calendar.get_user_db_id(telegram_id)
+    if not user_id:
+        await message.answer("ℹ️ Зарегистрируйтесь:\ncommand: '/register'", reply_markup=main_keyboard())
+        return
+
+    appointments = await sync_to_async(lambda: list(
+        Appointment.objects.filter(Q(organizer_id=user_id) | Q(invitee_id=user_id))
+        .select_related("event", "organizer", "invitee")
+        .order_by("date", "time")
+    ))()
+
+    if not appointments:
+        await message.answer("🫶 Приглашений нет", reply_markup=main_keyboard())
+        return
+
+    incoming = [a for a in appointments if a.invitee_id == user_id]
+    outgoing = [a for a in appointments if a.organizer_id == user_id]
+
+    def fmt(appt):
+        ev = appt.event
+        org = appt.organizer
+        # Дата берём из записи приглашения, время форматируем как %H:%M
+        time_str = appt.time.strftime("%H:%M")
+        date_str = f"{appt.date} ({time_str})"
+        details = ev.details or "—"
+        return (
+            f"👤 {org.username}\n"
+            f"📌 {ev.name}\n"
+            f"🕒 {date_str}\n"
+            f"💬 {details}"
+        )
+
+    parts = []
+    if incoming:
+        parts.append("⚡📨  Входящие приглашения:")
+        for ap in incoming:
+            parts.append(fmt(ap))
+    if outgoing:
+        parts.append("🚀📩  Исходящие приглашения:")
+        for ap in outgoing:
+            parts.append(fmt(ap))
+
+    await message.answer("\n\n".join(parts), reply_markup=main_keyboard())
+
+
+@router.message(Command("public_events"))
+async def public_events_command(message: types.Message):
+    await show_public_events_for_user(message)
 
 
 @router.callback_query(lambda cq: cq.data.startswith("invite_event_"))
@@ -163,7 +181,7 @@ async def invite_event_start_callback(callback: types.CallbackQuery):
     )
 
 
-@router.message(F.text == "📋 Список событий")
+@router.message(F.text == "📜 Список событий")
 async def button_list_calendar_events(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
@@ -179,10 +197,10 @@ async def button_list_calendar_events(message: types.Message):
         await message.answer("Событий пока нет.", reply_markup=main_keyboard())
         return
     lines = [
-        f"🔵 {e['order']}: {e['name']}:  {e['date']} ({datetime.strptime(e['time'], '%H:%M:%S').strftime('%H:%M')}) — {e['details']}"
+        f"🔹 {e['order']}: {e['name']}:  {e['date']} ({datetime.strptime(e['time'], '%H:%M:%S').strftime('%H:%M')})\n🔸 {e['details']}"
         for e in events
     ]
-    await message.answer("🗓️ Список событий:\n\n" + "\n".join(lines), reply_markup=main_keyboard())
+    await message.answer("📜 Список событий:\n\n" + "\n".join(lines) + "\n", reply_markup=main_keyboard())
 
 
 @router.message(Command("calendar_list"))
@@ -247,7 +265,7 @@ async def calendar_show_handler(message: types.Message):
         await message.answer("Ошибка. Проверь ID.", reply_markup=main_keyboard())
 
 
-@router.message(F.text == "⬇️ Выгрузить мои события")
+@router.message(F.text == "🔗 Выгрузить")
 async def send_export_links(message: types.Message):
     base_url = "http://127.0.0.1:8000/"
     text = (
@@ -268,7 +286,7 @@ async def start_edit_event_callback(callback: types.CallbackQuery):
     telegram_id = callback.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
-        await callback.message.answer("ℹ️ Зарегистрируйтесь:\ncommand: '/register'", reply_markup=main_keyboard())
+        await callback.message.answer("ℹ️ Зарегистрируйтесь:\n\ncommand: '/register'", reply_markup=main_keyboard())
         await callback.answer()
         return
 
@@ -350,7 +368,7 @@ async def command_invite_user(message: types.Message):
 
     if not (organizer and invitee and event):
         await message.answer(
-            "Проверьте корректность.",
+            "⚠️🔎 Проверьте корректность.",
             reply_markup=main_keyboard()
         )
         return
@@ -363,12 +381,12 @@ async def command_invite_user(message: types.Message):
         event=event,
         date=date,
         time=time,
-        details=f"Организатор {message.from_user.full_name}"
+        details=f"👤 Организатор {message.from_user.full_name}"
     )
 
     if not appt:
         await message.answer(
-            "Пользователь занят.",
+            "😔 Пользователь занят",
             reply_markup=main_keyboard()
         )
         return
@@ -376,7 +394,7 @@ async def command_invite_user(message: types.Message):
     bot = await get_bot()
     await bot.send_message(
         invitee_telegram_id,
-        f"😎📩\nВы приглашены на событие:\n'{event.name}' {date} в {time}.",
+        f"😎📩\nВы приглашены на событие:\n'{event.name}' {date} в {time}",
         reply_markup=get_invite_keyboard(appt.id)
     )
 

@@ -215,7 +215,7 @@ class Calendar:
             return appointment
 
         except Exception as e:
-            logger.error(f"Ошибка создания приглашения: {e}")
+            logger.error(f"❌ Ошибка создания приглашения: {e}")
             return None
 
     async def make_event_public(self, event_id: int, user_id: int) -> bool:

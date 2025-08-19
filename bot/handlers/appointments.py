@@ -18,7 +18,7 @@ router = Router()
 
 
 ##### СТАТУС ПРИГЛАШЕНИЙ #####
-@router.message(lambda message: message.text == "🔎 Статус приглашений")
+@router.message(lambda message: message.text == "🔍 Статус приглашений")
 async def status_button_handler(message: types.Message):
     await display_status(message)
 
@@ -132,7 +132,7 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
         result = await send_invitation_to_user(invitee, event, appointment)
 
         if result == "SENT":
-            await callback_query.answer(f"{invitee.username} приглашён через Telegram!", show_alert=True)
+            await callback_query.answer(f"{invitee.username} приглашён в Telegram!", show_alert=True)
         else:
             await callback_query.answer(
                 f"{invitee.username} получил уведомление через сайт.",
