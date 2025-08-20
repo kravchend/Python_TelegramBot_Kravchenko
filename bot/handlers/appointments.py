@@ -50,10 +50,10 @@ async def display_status(message: types.Message):
         event = appt.event
         organizer = appt.organizer
         text = (
-            f"Организатор: {organizer.username}\n"
-            f"Событие: {event.name}\n"
-            f"🗓️ Дата: {event.date} {event.time}\n"
-            f"Статус: {status_display.get(appt.status, '❓ Неизвестно')}"
+            f" 👤 {organizer.username}\n"
+            f" 🔹 {event.name}\n"
+            f" 🕒 {event.date} {event.time.strftime('%H:%M')}\n"
+            f" 👉{status_display.get(appt.status, '❓ Неизвестно')}"
         )
         if appt.status == "pending":
             keyboard = appointment_action_keyboard(appt.id)
@@ -62,14 +62,15 @@ async def display_status(message: types.Message):
             await message.answer(text)
 
     if organizer_appointments:
-        text = " 👤 Вы организатор\n"
+        text = "👑👤 Вы организатор\n"
         for appt in organizer_appointments:
             event = appt.event
             invitee = appt.invitee
             text += (
-                f" 📅 Событие: {event.name} | Дата: {event.date} {event.time}\n"
-                f" 👥 Участник: {invitee.username}\n"
-                f" 📊 Статус: {status_display.get(appt.status, '❓ Неизвестно')}\n\n"
+                f" 🔹 {event.name}"
+                f" 🕒 {event.date} {event.time.strftime('%H:%M')}\n"
+                f" 🧑‍🤝‍🧑 {invitee.username}\n"
+                f" 👉 {status_display.get(appt.status, '🤷 Неизвестно')}\n\n"
             )
         await message.answer(text, reply_markup=main_keyboard())
 
