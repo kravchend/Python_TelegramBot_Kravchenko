@@ -115,8 +115,8 @@ async def make_public_handler(message: types.Message):
             "Не удалось! (Возможно, уже публичное)")
 
 
-##### Общие сообытия: "🧑‍🤝‍🧑 Общие" / "/public_events" #####
-@router.message(F.text == "🧑‍🤝‍🧑 Общие")
+##### Общие сообытия: "🧑‍🤝‍🧑  Общие" / "/public_events" #####
+@router.message(F.text == "🧑‍🤝‍🧑  Общие")
 async def show_public_events_for_user(message: types.Message):
     from calendarapp.models import Appointment
     telegram_id = message.from_user.id
@@ -148,7 +148,7 @@ async def show_public_events_for_user(message: types.Message):
         return (
             f"👤 {org.username}\n"
             f"📌 {ev.name}\n"
-            f"🕒 {date_str}\n"
+            f"⌛ {date_str}\n"
             f"💬 {details}"
         )
 
@@ -181,7 +181,7 @@ async def invite_event_start_callback(callback: types.CallbackQuery):
     )
 
 
-@router.message(F.text == "📜 Список событий")
+@router.message(F.text == "📜  События")
 async def button_list_calendar_events(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
@@ -197,10 +197,16 @@ async def button_list_calendar_events(message: types.Message):
         await message.answer("Событий пока нет.", reply_markup=main_keyboard())
         return
     lines = [
-        f"🔹 {e['order']}: {e['name']}:  {e['date']} ({datetime.strptime(e['time'], '%H:%M:%S').strftime('%H:%M')})\n🔸 {e['details']}"
+        (
+            # f" 💡  {e['order']}\n"
+            f" ✏️  {e['name']}\n"
+            f" ⏳  {datetime.strptime(e['date'], '%Y-%m-%d').strftime('%d-%m-%Y')}"
+            f"  ({datetime.strptime(e['time'], '%H:%M:%S').strftime('%H:%M')})\n"
+            f" ╰┈➤   {e['details']}\n"
+        )
         for e in events
     ]
-    await message.answer("📜 Список событий:\n\n" + "\n".join(lines) + "\n", reply_markup=main_keyboard())
+    await message.answer(" 📜\n\n" + "\n".join(lines) + "\n", reply_markup=main_keyboard())
 
 
 @router.message(Command("calendar_list"))
@@ -265,7 +271,7 @@ async def calendar_show_handler(message: types.Message):
         await message.answer("Ошибка. Проверь ID.", reply_markup=main_keyboard())
 
 
-@router.message(F.text == "🔗 Выгрузить")
+@router.message(F.text == "🔗  Выгрузить")
 async def send_export_links(message: types.Message):
     base_url = "http://127.0.0.1:8000/"
     text = (
@@ -341,7 +347,7 @@ async def user_calendar_handler(message: types.Message):
     )
 
 
-@router.message(F.text == "📆 Календарь")
+@router.message(F.text == "📆  Календарь")
 async def show_calendar_month(message: types.Message):
     html_calendar, year, month = calendar.render_for_template()
     txt = f"Календарь за {month:02}.{year}:\n"

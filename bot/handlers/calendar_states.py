@@ -20,7 +20,7 @@ def log_func(func):
     return wrapper
 
 
-@router.message(F.text == "📝 Создать")
+@router.message(F.text == "✏️  Создать")
 @router.message(Command("calendar_create"))
 @log_func
 async def calendar_create_handler(message: types.Message, **kwargs):
@@ -33,7 +33,7 @@ async def calendar_create_handler(message: types.Message, **kwargs):
         )
         return
     calendar_creation_state[telegram_id] = {"step": "name"}
-    await message.answer("Название события:")
+    await message.answer(" ☝️ Введите название:")
 
 
 @router.message(lambda message: calendar_creation_state.get(message.from_user.id) is not None)
@@ -59,20 +59,20 @@ async def process_calendar_creation(message: types.Message, **kwargs):
         if step == "name":
             state["name"] = message.text.strip()
             state["step"] = "details"
-            await message.answer("Описание события:")
+            await message.answer(" ✌️ Описание события:")
             return
 
         if step == "details":
             state["details"] = message.text.strip()
             state["step"] = "date"
-            await message.answer("Дата события (ГГГГ-ММ-ДД):")
+            await message.answer(" 🤟 Дата события (ГГГГ-ММ-ДД):")
             return
 
         if step == "date":
             datetime.strptime(message.text.strip(), "%Y-%m-%d")  # Валидация
             state["date"] = message.text.strip()
             state["step"] = "time"
-            await message.answer("Время события (ЧЧ:ММ):")
+            await message.answer(" 🖖 Время события (ЧЧ:ММ):")
             return
 
         if step == "time":
@@ -182,7 +182,7 @@ async def process_calendar_editing_by_number(message: types.Message, **kwargs):
         calendar_edit_state.pop(telegram_id, None)
 
 
-@router.message(F.text == "🔑 Изменить")
+@router.message(F.text == "🔑  Изменить")
 @log_func
 async def button_edit_calendar_event(message: types.Message, **kwargs):
     from bot.handlers.events import get_user_events_with_index
@@ -213,7 +213,7 @@ async def button_edit_calendar_event(message: types.Message, **kwargs):
 
 
 # @router.message(Command("calendar_delete"))
-@router.message(F.text == "🗑️ Удалить")
+@router.message(F.text == "🗑️  Удалить")
 @log_func
 async def button_delete_calendar_event(message: types.Message, **kwargs):
     from bot.handlers.events import get_user_events_with_index
@@ -230,8 +230,8 @@ async def button_delete_calendar_event(message: types.Message, **kwargs):
         await message.answer("Нет событий для удаления.", reply_markup=main_keyboard())
         return
     calendar_delete_state[telegram_id] = events
-    text = "\n".join(f"{i + 1}. {e['name']} {e['date']} {e['time']}" for i, e in enumerate(events))
-    await message.answer("Ваши события:\n" + text + "\n\nОтправьте номер события для удаления.")
+    text = "\n".join(f"🔹 {i + 1}. {e['name']} {e['date']} ({datetime.strptime(e['time'], '%H:%M:%S').strftime('%H:%M')})" for i, e in enumerate(events))
+    await message.answer(" 📝  Ваши события:\n\n" + text + "\n\n⚠️ Отправьте номер события для удаления:\n\n 👇     👇     👇     👇     👇     👇     👇")
 
 
 @router.message(lambda message: calendar_delete_state.get(message.from_user.id) is not None)
@@ -247,7 +247,7 @@ async def process_calendar_deletion(message: types.Message, **kwargs):
         )
         return
     if not events:
-        await message.answer("Нет доступных событий.")
+        await message.answer(" 🤷 Нет доступных событий.")
         return
     try:
         num = int(message.text.strip())
@@ -257,9 +257,9 @@ async def process_calendar_deletion(message: types.Message, **kwargs):
         event_id = event_item["id"] if isinstance(event_item, dict) else event_item.id
         result = await calendar.delete_event(user_id, event_id)
         if result:
-            await message.answer("Событие удалено.", reply_markup=main_keyboard())
+            await message.answer(" 🗑️ Событие удалено.", reply_markup=main_keyboard())
         else:
-            await message.answer("Событие не найдено.", reply_markup=main_keyboard())
+            await message.answer(" 🤷 Событие не найдено.", reply_markup=main_keyboard())
         calendar_delete_state.pop(telegram_id, None)
     except Exception as e:
         await message.answer(f"❗❌ Некорректный номер")

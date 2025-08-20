@@ -7,26 +7,26 @@ from asgiref.sync import sync_to_async
 def main_keyboard():
     keyboard = [
         [
-            types.KeyboardButton(text="📝 Создать"),
-            types.KeyboardButton(text="📜 Список событий"),
-            types.KeyboardButton(text="📆 Календарь"),
-            # types.KeyboardButton(text="🔍 Статус приглашений"),
+            types.KeyboardButton(text="✏️  Создать"),
+            types.KeyboardButton(text="📜  События"),
+            types.KeyboardButton(text="📆  Календарь"),
+            # types.KeyboardButton(text="🔍  Статус приглашений"),
         ],
         # [
-        #     types.KeyboardButton(text="📝 Создать"),
-        #     types.KeyboardButton(text="📜 Список событий"),
+        #     types.KeyboardButton(text="✏️  Создать"),
+        #     types.KeyboardButton(text="📜  События"),
         # ],
         [
 
-            types.KeyboardButton(text="🧑‍🤝‍🧑 Общие"),
-            types.KeyboardButton(text="🔑 Изменить"),
-            types.KeyboardButton(text="🗑️ Удалить"),
-            # types.KeyboardButton(text="🔍 Статус приглашений"),
+            types.KeyboardButton(text="🧑‍🤝‍🧑  Общие"),
+            types.KeyboardButton(text="🔑  Изменить"),
+            types.KeyboardButton(text="🗑️  Удалить"),
+            # types.KeyboardButton(text="🔍  Статус приглашений"),
         ],
         [
-            types.KeyboardButton(text="🔍 Статус приглашений"),
-            # types.KeyboardButton(text="🧑‍🤝‍🧑 Общие"),
-            types.KeyboardButton(text="🔗 Выгрузить"),
+            types.KeyboardButton(text="🔍  Статус приглашений"),
+            # types.KeyboardButton(text="🧑‍🤝‍🧑  Общие"),
+            types.KeyboardButton(text="🔗  Выгрузить"),
         ],
     ]
     return types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True, is_persistent=True)

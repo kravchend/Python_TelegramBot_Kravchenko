@@ -18,7 +18,7 @@ router = Router()
 
 
 ##### СТАТУС ПРИГЛАШЕНИЙ #####
-@router.message(lambda message: message.text == "🔍 Статус приглашений")
+@router.message(lambda message: message.text == "🔍  Статус приглашений")
 async def status_button_handler(message: types.Message):
     await display_status(message)
 
@@ -62,7 +62,7 @@ async def display_status(message: types.Message):
             await message.answer(text)
 
     if organizer_appointments:
-        text = "👑👤 Вы организатор\n"
+        text = "✨🗽 Вы организатор\n\n"
         for appt in organizer_appointments:
             event = appt.event
             invitee = appt.invitee
@@ -219,7 +219,7 @@ async def appointment_action_callback(callback: types.CallbackQuery):
         await callback.answer("⛔Некорректные данные.", show_alert=True)
     except TelegramBadRequest as e:
         logger.error(f"Ошибка отправки сообщения: {e}")
-        await callback.answer("⚠️ \nОшибка отправки сообщения.\nВозможно, пользователь заблокировал бота.", show_alert=True)
+        await callback.answer("⚠️ Ошибка отправки сообщения.\n\nВозможно, пользователь заблокировал бота.", show_alert=True)
     except Exception as e:
         logger.error(f"Ошибка обработки callback: {e}")
         await callback.answer("❗\nПроизошла ошибка.\nПопробуйте позже.", show_alert=True)
