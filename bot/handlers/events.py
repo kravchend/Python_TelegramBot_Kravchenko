@@ -35,7 +35,7 @@ async def get_user_events_with_index(user_id):
 def render_event_message(event):
     date_event = event.date.strftime('%d.%m.%Y')
     time_event = event.time.strftime('%H:%M')
-    text = f"✨ Событие: {event.name}\n\n⏱️: {date_event} ({time_event})\n\nℹ️: {event.details}"
+    text = f" ✨ Событие: {event.name}\n\n⏱️: {date_event} ({time_event})\n\nℹ️: {event.details}"
     keyboard = event_public_action_keyboard(event.id, getattr(event, 'is_public', False))
     return text, keyboard
 
@@ -198,7 +198,6 @@ async def button_list_calendar_events(message: types.Message):
         return
     lines = [
         (
-            # f" 💡  {e['order']}\n"
             f" ✏️  {e['name']}\n"
             f" ⏳  {datetime.strptime(e['date'], '%Y-%m-%d').strftime('%d-%m-%Y')}"
             f"  ({datetime.strptime(e['time'], '%H:%M:%S').strftime('%H:%M')})\n"
@@ -271,6 +270,7 @@ async def calendar_show_handler(message: types.Message):
         await message.answer("Ошибка. Проверь ID.", reply_markup=main_keyboard())
 
 
+##### Выгрузить: "🔗  Выгрузить" / '/export' #####
 @router.message(F.text == "🔗  Выгрузить")
 async def send_export_links(message: types.Message):
     base_url = "http://127.0.0.1:8000/"
@@ -315,38 +315,6 @@ async def start_edit_event_callback(callback: types.CallbackQuery):
 
 
 @router.message(Command("calendar"))
-async def user_calendar_handler(message: types.Message):
-    telegram_id = message.from_user.id
-    user_id = await calendar.get_user_db_id(telegram_id)
-    if not user_id:
-        await message.answer(
-            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
-            reply_markup=main_keyboard()
-        )
-        return
-
-    events = await sync_to_async(lambda: list(
-        Event.objects.filter(
-            Q(user_id=user_id) | Q(appointment__invitee_id=user_id) | Q(is_public=True)
-        ).order_by('date', 'time')
-    ))()
-
-    if not events:
-        await message.answer("Нет доступных событий 😞", reply_markup=main_keyboard())
-        return
-
-    lines = [
-        f"{e.id}: {e.name} | {e.date} {e.time} — {e.details}" for e in events
-    ]
-    calendar_url = f"http://127.0.0.1:8000/calendar/?user_id={user_id}"
-
-    await message.answer(
-        "Ваш календарь:\n" + "\n".join(lines) + f"\n\n🔗 <a href='{calendar_url}'>Открыть календарь</a>",
-        reply_markup=main_keyboard(),
-        parse_mode="HTML"
-    )
-
-
 @router.message(F.text == "📆  Календарь")
 async def show_calendar_month(message: types.Message):
     html_calendar, year, month = calendar.render_for_template()

@@ -90,7 +90,7 @@ async def update_appointment_status(request, pk):
             await sync_to_async(setattr)(appointment, 'status', 'confirmed')
             message_to_invitee = "Вы подтвердили встречу."
             message_to_organizer = (
-                f"{await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие "
+                f" ✅  \n 👤  Пользователь {await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие \n"
                 f"в событии '{await sync_to_async(lambda: appointment.event.name)()}'."
             )
         elif action == 'cancel':

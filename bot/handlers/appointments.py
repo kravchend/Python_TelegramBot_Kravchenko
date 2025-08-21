@@ -83,11 +83,8 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
     data = callback_query.data
 
     if data == "invite_done":
-        # await callback_query.message.edit_text(
-        #     "✅ Приглашение завершено!", reply_markup=None
-        # )
         await callback_query.message.answer(
-            "✅ Приглашение завершено!",
+            " ✅ Приглашение завершено!",
             reply_markup=main_keyboard(),
         )
         return
@@ -115,7 +112,7 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
 
         if appointment and appointment.status in ["pending", "confirmed"]:
             await callback_query.answer(
-                f"⚠️ {invitee.username} уже приглашен",
+                f" ⚠️ {invitee.username} уже приглашен",
                 show_alert=True
             )
             return
@@ -200,29 +197,29 @@ async def appointment_action_callback(callback: types.CallbackQuery):
 
         if organizer_telegram_id:
             organizer_message = (
-                f"⏳ Пользователь {invitee_username} {organizer_action_text} "
+                f" 👤  Пользователь {invitee_username} \n {organizer_action_text} \n"
                 f"приглашение на событие \"{event_name}\"."
             )
             try:
                 await bot.send_message(organizer_telegram_id, organizer_message)
             except TelegramBadRequest as e:
                 logger.error(
-                    f"Ошибка отправки уведомления организатору (Telegram ID {organizer_telegram_id}): {e}"
+                    f" ❌ ⚠️  Ошибка отправки уведомления организатору \n(Telegram ID {organizer_telegram_id}): {e}"
                 )
 
         await callback.message.edit_text(participant_action_text)
         await callback.answer(participant_action_text)
 
     except Appointment.DoesNotExist:
-        await callback.answer("❓Встреча не найдена.", show_alert=True)
+        await callback.answer(" ❓  Встреча не найдена.", show_alert=True)
     except ValueError as e:
-        await callback.answer("⛔Некорректные данные.", show_alert=True)
+        await callback.answer(" ⛔  Некорректные данные.", show_alert=True)
     except TelegramBadRequest as e:
         logger.error(f"Ошибка отправки сообщения: {e}")
-        await callback.answer("⚠️ Ошибка отправки сообщения.\n\nВозможно, пользователь заблокировал бота.", show_alert=True)
+        await callback.answer(" ⚠️  Ошибка отправки сообщения.\n\nВозможно, пользователь заблокировал бота.", show_alert=True)
     except Exception as e:
         logger.error(f"Ошибка обработки callback: {e}")
-        await callback.answer("❗\nПроизошла ошибка.\nПопробуйте позже.", show_alert=True)
+        await callback.answer(" ❗ \nПроизошла ошибка.\nПопробуйте позже.", show_alert=True)
 
 
 @sync_to_async
