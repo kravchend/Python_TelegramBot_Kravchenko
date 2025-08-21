@@ -28,7 +28,7 @@ async def calendar_create_handler(message: types.Message, **kwargs):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -48,7 +48,7 @@ async def process_calendar_creation(message: types.Message, **kwargs):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -126,7 +126,7 @@ async def process_calendar_editing_by_number(message: types.Message, **kwargs):
 
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
-        await message.answer("ℹ️ Зарегистрируйтесь:\ncommand: '/register'", reply_markup=main_keyboard())
+        await message.answer(" 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
         calendar_edit_state.pop(telegram_id, None)
         return
 
@@ -190,7 +190,7 @@ async def button_edit_calendar_event(message: types.Message, **kwargs):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -222,7 +222,7 @@ async def button_delete_calendar_event(message: types.Message, **kwargs):
     events = await get_user_events_with_index(user_id)
     if not user_id:
         await message.answer(
-            "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -242,7 +242,7 @@ async def process_calendar_deletion(message: types.Message, **kwargs):
     events = calendar_delete_state.get(telegram_id)
     if not user_id or telegram_id not in calendar_delete_state:
         await message.answer(
-            "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return

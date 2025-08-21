@@ -122,7 +122,7 @@ async def show_public_events_for_user(message: types.Message):
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
-        await message.answer("ℹ️ Зарегистрируйтесь:\ncommand: '/register'", reply_markup=main_keyboard())
+        await message.answer(" 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
         return
 
     appointments = await sync_to_async(lambda: list(
@@ -132,7 +132,7 @@ async def show_public_events_for_user(message: types.Message):
     ))()
 
     if not appointments:
-        await message.answer("🫶 Приглашений нет", reply_markup=main_keyboard())
+        await message.answer(" 🤷 Приглашений нет", reply_markup=main_keyboard())
         return
 
     incoming = [a for a in appointments if a.invitee_id == user_id]
@@ -187,7 +187,7 @@ async def button_list_calendar_events(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -215,7 +215,7 @@ async def calendar_list_handler(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -252,7 +252,7 @@ async def calendar_show_handler(message: types.Message):
         user_id = await calendar.get_user_db_id(telegram_id)
         if not user_id:
             await message.answer(
-                "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+                " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
                 reply_markup=main_keyboard()
             )
             return
@@ -320,7 +320,7 @@ async def user_calendar_handler(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            "ℹ️ Зарегистрируйтесь:\ncommand: '/register'",
+            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -351,7 +351,7 @@ async def user_calendar_handler(message: types.Message):
 async def show_calendar_month(message: types.Message):
     html_calendar, year, month = calendar.render_for_template()
     txt = f"Календарь за {month:02}.{year}:\n"
-    await message.answer(txt + "\n🔗✨Открыть на сайте:\nhttp://127.0.0.1:8000/home/")
+    await message.answer(txt + "\n  🔗  Открыть на сайте: \n http://127.0.0.1:8000/calendar/ ")
 
 
 @router.message(Command("invite"))

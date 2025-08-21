@@ -19,6 +19,7 @@ async def get_bot():
 
 
 @router.message(Command("start"))
+@router.message(Command("register"))
 async def send_welcome(message: types.Message):
     telegram_id = message.from_user.id
     username = message.from_user.username or f"User_{telegram_id}"
@@ -38,19 +39,19 @@ async def send_welcome(message: types.Message):
             user.set_password(password)
             await sync_to_async(user.save)()
             await message.answer(
-                f"     ✨      🎉     💫  \n\n"
+                f"     ✨    ✨    ✨    ✨    ✨    ✨    ✨    ✨     \n\n"
                 
-                f" Здравствуйте, {username}!\n\n"
-                f"  🤝  Вы успешно зарегистрированы!\n\n"
+                f"  🎉🤝  {username}, \n вы успешно зарегистрированы!\n\n"
                 
-                f"  🚀  Ваши данные для входа на сайт:\n"
-                f"  🔗  http://127.0.0.1:8000/register\n\n"
+                f"  🚀  Ваши данные для входа на сайт:\n\n"
                 
                 f"  👤  Username: `{username}`\n"
                 f"  🔐  Password: `{password}`\n\n"
                 
-                f"  ⚠️💫  Используйте эти данные для входа на сайт и"
-                f"  получите доступ к записям на других утсройствах!",
+                f"  🔗  http://127.0.0.1:8000/login/\n\n"
+                
+                f"⚠️💫  Используйте данные для доступа к\n записям на других утсройствах!",
+
                 reply_markup=main_keyboard(),
                 parse_mode="Markdown"
             )
