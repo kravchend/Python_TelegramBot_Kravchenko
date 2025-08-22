@@ -40,30 +40,30 @@ async def send_welcome(message: types.Message):
             await sync_to_async(user.save)()
             await message.answer(
                 f"     ✨    ✨    ✨    ✨    ✨    ✨    ✨    ✨     \n\n"
-                
+
                 f"  🎉🤝  {username}, \n вы успешно зарегистрированы!\n\n"
-                
+
                 f"  🚀  Ваши данные для входа на сайт:\n\n"
-                
+
                 f"  👤  Username: `{username}`\n"
                 f"  🔐  Password: `{password}`\n\n"
-                
+
                 f"  🔗  http://127.0.0.1:8000/login/\n\n"
-                
-                f"⚠️💫  Используйте данные для доступа к\n записям на других утсройствах!",
+
+                f"⚠️💫  Используйте данные для доступа к\n записям на других устройствах!",
 
                 reply_markup=main_keyboard(),
                 parse_mode="Markdown"
             )
         else:
             await message.answer(
-                f"  ✨👤   {username}, \nдобро пожаловать!",
+                f"  ✨👤   {username}, \n добро пожаловать!",
                 reply_markup=main_keyboard()
             )
 
     except Exception as e:
-        logger.error(f"Ошибка регистрации пользователя (Telegram ID {telegram_id}): {e}")
-        await message.answer("Произошла ошибка. Попробуйте позже.")
+        logger.error(f" ⚠️  Ошибка регистрации пользователя (Telegram ID {telegram_id}): {e}")
+        await message.answer(" ⚠️🤷  Произошла ошибка. Попробуйте позже.")
 
 
 async def get_user_id(message):

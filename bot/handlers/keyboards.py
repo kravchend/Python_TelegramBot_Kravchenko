@@ -12,20 +12,14 @@ def main_keyboard():
             types.KeyboardButton(text="📆  Календарь"),
             # types.KeyboardButton(text="🔍  Статус приглашений"),
         ],
-        # [
-        #     types.KeyboardButton(text="✏️  Создать"),
-        #     types.KeyboardButton(text="📜  События"),
-        # ],
         [
 
             types.KeyboardButton(text="🧑‍🤝‍🧑  Общие"),
             types.KeyboardButton(text="🔑  Изменить"),
             types.KeyboardButton(text="🗑️  Удалить"),
-            # types.KeyboardButton(text="🔍  Статус приглашений"),
         ],
         [
             types.KeyboardButton(text="🔍  Статус приглашений"),
-            # types.KeyboardButton(text="🧑‍🤝‍🧑  Общие"),
             types.KeyboardButton(text="🔗  Выгрузить"),
         ],
     ]
@@ -35,7 +29,7 @@ def main_keyboard():
 def get_invite_keyboard(event_id):
     return InlineKeyboardMarkup(
         inline_keyboard=[[
-            InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")
+            InlineKeyboardButton(text=" ➕ Пригласить", callback_data=f"invite_event_{event_id}")
         ]]
     )
 

@@ -4,6 +4,7 @@ from bot.handlers.keyboards import main_keyboard, get_invite_keyboard
 from bot.calendar_instance import calendar
 from datetime import datetime
 from bot.handlers.types import DummyEvent
+
 # from bot.handlers.events import get_user_events_with_index
 
 
@@ -51,7 +52,6 @@ async def button_edit_calendar_event(message: types.Message, **kwargs):
         "Номер события для редактирования:\n" + "\n".join(lines),
         reply_markup=types.ReplyKeyboardRemove()
     )
-
 
 
 @router.message(lambda message: calendar_creation_state.get(message.from_user.id) is not None)
@@ -134,7 +134,8 @@ async def process_calendar_creation(message: types.Message, **kwargs):
         calendar_creation_state.pop(telegram_id, None)
 
 
-@router.message(lambda message: calendar_edit_state.get(message.from_user.id) is not None and message.text and not message.text.startswith('/'))
+@router.message(lambda message: calendar_edit_state.get(
+    message.from_user.id) is not None and message.text and not message.text.startswith('/'))
 @log_func
 async def process_calendar_editing_by_number(message: types.Message, **kwargs):
     telegram_id = message.from_user.id
