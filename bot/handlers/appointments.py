@@ -51,7 +51,7 @@ async def display_status(message: types.Message):
         organizer = appt.organizer
         text = (
             f" 👤 {organizer.username}\n"
-            f" 🔹 {event.name}\n"
+            f" ✏️ {event.name}\n"
             f" 🕒 {event.date} {event.time.strftime('%H:%M')}\n"
             f" 👉 {status_display.get(appt.status, '❓ Неизвестно')}"
         )
@@ -67,15 +67,15 @@ async def display_status(message: types.Message):
             event = appt.event
             invitee = appt.invitee
             text += (
-                f" 🔹  {event.name}"
+                f" ✏️  {event.name}\n"
                 f" 🕒  {event.date} {event.time.strftime('%H:%M')}\n"
                 f" 🧑‍🤝‍🧑  {invitee.username}\n"
-                f" 👉  {status_display.get(appt.status, ' 🤷  Неизвестно')}\n\n"
+                f" 👉  {status_display.get(appt.status, ' 🤷  Неизвестно')}\n"
             )
         await message.answer(text, reply_markup=main_keyboard())
 
     if not invitee_appointments and not organizer_appointments:
-        await message.answer("🔔 Нет встреч или приглашений.", reply_markup=main_keyboard())
+        await message.answer(" 🔔  Нет встреч или приглашений.", reply_markup=main_keyboard())
 
 
 @router.callback_query(lambda cq: cq.data.startswith("invite_"))
@@ -84,14 +84,14 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
 
     if data == "invite_done":
         await callback_query.message.answer(
-            " ✅ Приглашение завершено!",
+            " ✅  Приглашение завершено!",
             reply_markup=main_keyboard(),
         )
         return
 
     parts = data.split("_")
     if len(parts) != 3:
-        await callback_query.answer(" ⛔ Некорректный формат кнопки!", show_alert=True)
+        await callback_query.answer(" ⛔  Некорректный формат кнопки!", show_alert=True)
         return
 
     _, event_id, invitee_tg_id = parts
@@ -112,7 +112,7 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
 
         if appointment and appointment.status in ["pending", "confirmed"]:
             await callback_query.answer(
-                f" ⚠️ {invitee.username} уже приглашен",
+                f" ⚠️  {invitee.username} уже приглашен",
                 show_alert=True
             )
             return

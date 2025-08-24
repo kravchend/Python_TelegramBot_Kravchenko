@@ -90,8 +90,8 @@ async def update_appointment_status(request, pk):
             await sync_to_async(setattr)(appointment, 'status', 'confirmed')
             message_to_invitee = "Вы подтвердили встречу."
             message_to_organizer = (
-                f" ✅  \n 👤  Пользователь {await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие \n"
-                f"в событии '{await sync_to_async(lambda: appointment.event.name)()}'."
+                f" ✅ \n 👤  Пользователь {await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие \n"
+                f"Событие: '{await sync_to_async(lambda: appointment.event.name)()}'."
             )
         elif action == 'cancel':
             await sync_to_async(setattr)(appointment, 'status', 'cancelled')
@@ -369,32 +369,32 @@ async def invite_users_to_event(request, pk):
                         await bot.send_message(
                             chat_id=user.telegram_id,
                             text=(
-                                f"😎📩\nНовое приглашение!\n\n"
-                                f"📌 {event.name}\n"
-                                f"🕒 {event.date} ({event.time:%H:%M})\n"
-                                f"💎 {event.details or 'Не указаны'}\n\n"
+                                f" 😎 📩  \n Новое приглашение! \n\n"
+                                f" 📌  {event.name}\n"
+                                f" 🕒  {event.date} ({event.time:%H:%M})\n"
+                                f" 💎  {event.details or 'Не указаны'}\n\n"
                             ),
                             reply_markup=appointment_action_keyboard(appointment.id)
                         )
 
                         delivered_invites.append(user.username)
                     except TelegramBadRequest as e:
-                        logger.error(f"❌Ошибка доставки сообщения {user.username}: {e}")
+                        logger.error(f" ❌  Ошибка доставки сообщения {user.username}: {e}")
                         failed_invites.append(user.username)
                 else:
                     failed_invites.append(user.username)
 
             except Exception as e:
-                logger.error(f"❌ Не удалось обработать пользователя {user.username}: {e}")
+                logger.error(f" ❌   Не удалось обработать пользователя {user.username}: {e}")
                 failed_invites.append(user.username)
 
         if failed_invites:
             messages.warning(
                 request,
-                f"⚠️🚀 Часть приглашений отправлена,\nно возникли проблемы с пользователями:\n{', '.join(failed_invites)}"
+                f" ⚠️🚀  Часть приглашений отправлена,\nно возникли проблемы с пользователями:\n{', '.join(failed_invites)}"
             )
         else:
-            messages.success(request, "🚀💫 Все приглашения отправлены!")
+            messages.success(request, " 🚀💫   Все приглашения отправлены!")
 
         return redirect('user_appointments')
 

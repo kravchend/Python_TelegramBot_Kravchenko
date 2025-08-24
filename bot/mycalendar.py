@@ -55,13 +55,13 @@ class Calendar:
                 defaults={'username': username}
             )
             if created:
-                logger.info(f"🎉 {telegram_id} зарегистрирован!")
+                logger.info(f" 🎉  {telegram_id} зарегистрирован!")
                 await self._increment_stat('user_count')
             else:
-                logger.info(f"🙂 {telegram_id} уже зарегистрирован!")
+                logger.info(f" 🙂  {telegram_id} уже зарегистрирован!")
             return True
         except Exception as e:
-            logger.error(f"❌ Ошибка регистрации пользователя {telegram_id}: {e}")
+            logger.error(f" ❌  Ошибка регистрации пользователя {telegram_id}: {e}")
             return False
 
     async def is_registered(self, telegram_id):
@@ -173,18 +173,18 @@ class Calendar:
             try:
                 date = datetime.strptime(date, "%Y-%m-%d").date()
             except Exception as e:
-                logger.error(f"Ошибка парсинга даты: {e}")
+                logger.error(f" ❗⚠️   Ошибка парсинга даты: {e}")
                 return None
 
         if isinstance(time, str):
             try:
                 time = datetime.strptime(time, "%H:%M").time()
             except Exception as e:
-                logger.error(f"Ошибка парсинга времени: {e}")
+                logger.error(f" ❗⚠️   Ошибка парсинга времени: {e}")
                 return None
 
         logger.debug(
-            f"DEBUG-invite: organizer={organizer.id}, invitee={invitee.id}, event={event.id}, date={date}, time={time}, details={details}"
+            f" ℹ DEBUG-invite: organizer={organizer.id}, invitee={invitee.id}, event={event.id}, date={date}, time={time}, details={details}"
         )
 
         try:
@@ -203,7 +203,7 @@ class Calendar:
             if not created:
                 if appointment.status in ["pending", "confirmed"]:
                     logger.info(
-                        f"Приглашение уже активно: статус '{appointment.status}' для invitee={invitee.id}, event={event.id}"
+                        f" ℹ  Приглашение уже активно: статус '{appointment.status}' для invitee={invitee.id}, event={event.id}"
                     )
                     return None
                 else:
@@ -211,11 +211,11 @@ class Calendar:
                     appointment.status = "pending"
                     await sync_to_async(appointment.save)()
 
-            logger.info(f"Приглашение создано: {appointment}")
+            logger.info(f" ✅  Приглашение создано: {appointment}")
             return appointment
 
         except Exception as e:
-            logger.error(f"❌ Ошибка создания приглашения: {e}")
+            logger.error(f" ❌   Ошибка создания приглашения: {e}")
             return None
 
     async def make_event_public(self, event_id: int, user_id: int) -> bool:

@@ -29,7 +29,7 @@ def main_keyboard():
 def get_invite_keyboard(event_id):
     return InlineKeyboardMarkup(
         inline_keyboard=[[
-            InlineKeyboardButton(text=" ➕ Пригласить", callback_data=f"invite_event_{event_id}")
+            InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")
         ]]
     )
 

@@ -132,7 +132,7 @@ async def show_public_events_for_user(message: types.Message):
     ))()
 
     if not appointments:
-        await message.answer(" 🤷 Приглашений нет", reply_markup=main_keyboard())
+        await message.answer(" 🤷  Приглашений нет", reply_markup=main_keyboard())
         return
 
     incoming = [a for a in appointments if a.invitee_id == user_id]
@@ -146,18 +146,18 @@ async def show_public_events_for_user(message: types.Message):
         details = ev.details or "—"
         return (
             f" 👤  {org.username} \n"
-            f" 📌  {ev.name} \n"
-            f" ⌛  {date_str} \n"
-            f" 💬  {details} "
+            f" ✏️  {ev.name} \n"
+            f" 🕒  {date_str} \n"
+            f" ┈➤  {details} "
         )
 
     parts = []
     if incoming:
-        parts.append(" ⚡📨  Входящие приглашения:")
+        parts.append("  ⚡📨  Входящие приглашения: ")
         for ap in incoming:
             parts.append(fmt(ap))
     if outgoing:
-        parts.append(" 🚀📩  Исходящие приглашения:")
+        parts.append("  🚀📩  Исходящие приглашения: ")
         for ap in outgoing:
             parts.append(fmt(ap))
 
@@ -201,13 +201,13 @@ async def button_list_calendar_events(message: types.Message):
     lines = [
         (
             f" ✏️  {e['name']}\n"
-            f" ⏳  {datetime.strptime(str(e['date']), '%Y-%m-%d').strftime('%d-%m-%Y')}"
+            f" 🕒  {datetime.strptime(str(e['date']), '%Y-%m-%d').strftime('%d-%m-%Y')}"
             f"  ({datetime.strptime(str(e['time']), '%H:%M:%S').strftime('%H:%M')})\n"
-            f" ╰┈➤   {e['details']}\n"
+            f" ┈➤   {e['details']}\n"
         )
         for e in events
     ]
-    await message.answer(" 📜\n\n" + " \n ".join(lines) + " \n ", reply_markup=main_keyboard())
+    await message.answer(" 👤📜 \n\n" + " \n ".join(lines) + " \n ", reply_markup=main_keyboard())
 
 
 @router.message(Command("calendar_list"))
@@ -310,7 +310,7 @@ async def start_edit_event_callback(callback: types.CallbackQuery):
         "id": event_id
     }
     await callback.message.answer(
-        f" ➡  {event['name']}\n ↪  Введите новое название:",
+        f" Херня ➡  {event['name']}\n ↪  Введите новое название:",
         reply_markup=types.ReplyKeyboardRemove()
     )
     await callback.answer()
