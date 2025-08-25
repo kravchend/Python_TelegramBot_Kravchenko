@@ -115,13 +115,12 @@ async def make_public_handler(message: types.Message):
             " ⚠️  Не удалось! (Возможно, уже публичное)")
 
 
-##### Общие сообытия: "🧑‍🤝‍🧑  Общие" / "/public_events" #####
+##### Общие события: "🧑‍🤝‍🧑 Общие" | "/public_events" #####
 @router.message(F.text == "🧑‍🤝‍🧑  Общие")
 async def show_public_events_for_user(message: types.Message):
     from calendarapp.models import Appointment
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
-    user_name = message.from_user.full_name
     if not user_id:
         await message.answer(" 🗝️  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
         return
@@ -139,15 +138,16 @@ async def show_public_events_for_user(message: types.Message):
     incoming = [a for a in appointments if a.invitee_id == user_id]
     outgoing = [a for a in appointments if a.organizer_id == user_id]
 
-    def fmt(appt, include_user: bool = True):
+    # # Имя пользователя Телеграм
+    # def user_line(appt) -> str:
+    #     return f" 👤  {appt.organizer.username} "
+
+    def fmt_event(appt) -> str:
         ev = appt.event
-        org = appt.organizer
         time_str = appt.time.strftime("%H:%M")
         date_str = f"{appt.date} ({time_str})"
         details = ev.details or "—"
-        user_line = f" 👤  {org.username} \n" if include_user else ""
         return (
-            f"{user_line}"
             f" ✏️  {ev.name} \n"
             f" 📆  {date_str} \n"
             f" ╰➤  {details} "
@@ -155,15 +155,31 @@ async def show_public_events_for_user(message: types.Message):
 
     parts = []
     if incoming:
-        parts.append(f" ⚡  Входящие приглашения:")
-        for ap in incoming:
-            parts.append(fmt(ap, include_user=True))
+        parts.append(" ⚡  Входящие приглашения:")
+        # for ap in incoming:
+        #     parts.append(f"{user_line(ap)}\n{fmt_event(ap)}")
+
     if outgoing:
         parts.append(" 🚀  Исходящие приглашения: ")
-        # Имя организатора выводим один раз для всего блока исходящих
-        parts.append(f" 👤  {outgoing[0].organizer.username} ")
+        # # Имя организатора, один раз для всего блока
+        # parts.append(user_line(outgoing[0]))
+
+        # Группируем исходящие по событию и слоту (дата+время)
+        grouped = {}
         for ap in outgoing:
-            parts.append(fmt(ap, include_user=False))
+            key = (ap.event_id, ap.date, ap.time)
+            if key not in grouped:
+                grouped[key] = {"appt": ap, "invitees": []}
+            grouped[key]["invitees"].append(ap.invitee.username)
+
+        # Сортировка ("date", "time")
+        for key, data in grouped.items():
+            ap = data["appt"]
+            invitees = ", ".join(sorted(set(data["invitees"])))
+            parts.append(
+                f"{fmt_event(ap)}\n"
+                f" 👫  {invitees}"
+            )
 
     await message.answer("\n\n".join(parts), reply_markup=main_keyboard())
 
@@ -317,7 +333,7 @@ async def command_invite_user(message: types.Message):
 
     if not (organizer and invitee and event):
         await message.answer(
-            " ⚠️🔎  Проверьте корректность.",
+            " ⚠️  Проверьте корректность.",
             reply_markup=main_keyboard()
         )
         return
