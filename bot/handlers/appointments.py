@@ -18,7 +18,7 @@ router = Router()
 
 
 ##### СТАТУС ПРИГЛАШЕНИЙ #####
-@router.message(lambda message: message.text == "🔍  Статус приглашений")
+@router.message(lambda message: message.text == "🎢  Статус приглашений")
 async def status_button_handler(message: types.Message):
     await display_status(message)
 
@@ -29,7 +29,7 @@ async def display_status(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
 
     if not user_id:
-        await message.answer(" 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
+        await message.answer(" 🗝️  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
         return
 
     invitee_appointments = await sync_to_async(lambda: list(
@@ -50,10 +50,10 @@ async def display_status(message: types.Message):
         event = appt.event
         organizer = appt.organizer
         text = (
-            f" 👤 {organizer.username}\n"
-            f" ✏️ {event.name}\n"
-            f" 🕒 {event.date} {event.time.strftime('%H:%M')}\n"
-            f" 👉 {status_display.get(appt.status, '❓ Неизвестно')}"
+            f" 👤  {organizer.username}\n"
+            f" ✏️  {event.name}\n"
+            f" 📅  {event.date} {event.time.strftime('%H:%M')}\n"
+            f" 👉  {status_display.get(appt.status, '❓ Неизвестно')}"
         )
         if appt.status == "pending":
             keyboard = appointment_action_keyboard(appt.id)
@@ -68,7 +68,7 @@ async def display_status(message: types.Message):
             invitee = appt.invitee
             text += (
                 f" ✏️  {event.name}\n"
-                f" 🕒  {event.date} {event.time.strftime('%H:%M')}\n"
+                f" 📅  {event.date} {event.time.strftime('%H:%M')}\n"
                 f" 🧑‍🤝‍🧑  {invitee.username}\n"
                 f" 👉  {status_display.get(appt.status, ' 🤷  Неизвестно')}\n"
             )
@@ -112,7 +112,7 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
 
         if appointment and appointment.status in ["pending", "confirmed"]:
             await callback_query.answer(
-                f" ⚠️  {invitee.username} уже приглашен",
+                f"⚠️  {invitee.username} уже приглашен",
                 show_alert=True
             )
             return
@@ -135,20 +135,20 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
             await callback_query.answer(
                 f"{invitee.username} получил уведомление через сайт.",
                 show_alert=True,
-                reply_markup = main_keyboard(),
+                reply_markup=main_keyboard(),
             )
 
         users = await get_invitable_users(event_id=event_id, exclude_user_id=organizer_tg_id)
         if not users:
             await callback_query.message.answer(
-                "Все пользователи приглашены! Спасибо.",
+                "👍  Все пользователи приглашены!",
                 reply_markup=main_keyboard(),
             )
 
         else:
             keyboard = get_users_invite_keyboard(event.id, users)
             await callback_query.message.edit_text(
-                "Кого пригласить на это событие? Выберите пользователя:",
+                "🤷  Пригласить еще? ",
                 reply_markup=keyboard
             )
 
@@ -168,21 +168,21 @@ async def appointment_action_callback(callback: types.CallbackQuery):
         if data.startswith("appt_confirm_"):
             appointment_id = int(data.replace("appt_confirm_", ""))
             action = "confirmed"
-            participant_action_text = "Вы подтвердили участие в событии!"
+            participant_action_text = "🙋  Вы подтвердили участие!"
             organizer_action_text = "подтвердил"
         elif data.startswith("appt_cancel_"):
             appointment_id = int(data.replace("appt_cancel_", ""))
             action = "cancelled"
-            participant_action_text = "Вы отклонили приглашение на событие!"
+            participant_action_text = "🙅  Вы отклонили приглашение"
             organizer_action_text = "отклонил"
         else:
-            raise ValueError("Некорректный формат данных.")
+            raise ValueError("⚠️  Некорректный формат данных.")
 
         appointment = await sync_to_async(Appointment.objects.get)(id=appointment_id)
         invitee_telegram_id = await sync_to_async(lambda: appointment.invitee.telegram_id)()
 
         if callback.from_user.id != invitee_telegram_id:
-            await callback.answer("Только приглашённый может выполнить это действие.", show_alert=True)
+            await callback.answer("⚠️  Только приглашённый может выполнить это действие.", show_alert=True)
             return
 
         def update_status():
@@ -197,29 +197,30 @@ async def appointment_action_callback(callback: types.CallbackQuery):
 
         if organizer_telegram_id:
             organizer_message = (
-                f" 👤  Пользователь {invitee_username} \n {organizer_action_text} \n"
-                f"приглашение на событие \"{event_name}\"."
+                f" 👤  {invitee_username} \n {organizer_action_text} \n"
+                f" 📨  приглашение на событие \"{event_name}\"."
             )
             try:
                 await bot.send_message(organizer_telegram_id, organizer_message)
             except TelegramBadRequest as e:
                 logger.error(
-                    f" ❌ ⚠️  Ошибка отправки уведомления организатору \n(Telegram ID {organizer_telegram_id}): {e}"
+                    f"⚠️  Ошибка отправки уведомления организатору \n(Telegram ID {organizer_telegram_id}): {e}"
                 )
 
         await callback.message.edit_text(participant_action_text)
         await callback.answer(participant_action_text)
 
     except Appointment.DoesNotExist:
-        await callback.answer(" ❓  Встреча не найдена.", show_alert=True)
+        await callback.answer("⚠️  Встреча не найдена.", show_alert=True)
     except ValueError as e:
-        await callback.answer(" ⛔  Некорректные данные.", show_alert=True)
+        await callback.answer("⚠️  Некорректные данные.", show_alert=True)
     except TelegramBadRequest as e:
         logger.error(f"Ошибка отправки сообщения: {e}")
-        await callback.answer(" ⚠️  Ошибка отправки сообщения.\n\nВозможно, пользователь заблокировал бота.", show_alert=True)
+        await callback.answer("⚠️  Ошибка отправки сообщения.\n\nВозможно, пользователь заблокировал бота.",
+                              show_alert=True)
     except Exception as e:
         logger.error(f"Ошибка обработки callback: {e}")
-        await callback.answer(" ❗ \nПроизошла ошибка.\nПопробуйте позже.", show_alert=True)
+        await callback.answer("⚠️ \nПроизошла ошибка.\nПопробуйте позже.", show_alert=True)
 
 
 @sync_to_async

@@ -35,7 +35,7 @@ async def get_user_events_with_index(user_id):
 def render_event_message(event):
     date_event = event.date.strftime('%d.%m.%Y')
     time_event = event.time.strftime('%H:%M')
-    text = f" ✨ Событие: {event.name}\n\n⏱️: {date_event} ({time_event})\n\nℹ️: {event.details}"
+    text = f" ✏️  {event.name}\n 📆  {date_event} ({time_event})\n ╰➤  {event.details}"
     keyboard = event_public_action_keyboard(event.id, getattr(event, 'is_public', False))
     return text, keyboard
 
@@ -47,11 +47,11 @@ async def make_event_public_callback(callback: types.CallbackQuery):
         event = await sync_to_async(Event.objects.get)(id=event_id)
         event.is_public = True
         await sync_to_async(event.save)()
-        await callback.answer("Теперь это событие публичное.")
+        await callback.answer(" 🌐  Событие публичное.")
         text, markup = render_event_message(event)
         await callback.message.edit_text(text, reply_markup=markup)
     except Event.DoesNotExist:
-        await callback.answer("Событие не найдено.", show_alert=True)
+        await callback.answer(" 🤷  Событие не найдено.", show_alert=True)
 
 
 @router.callback_query(lambda c: c.data.startswith("event_private_"))
@@ -61,11 +61,11 @@ async def make_event_private_callback(callback: types.CallbackQuery):
         event = await sync_to_async(Event.objects.get)(id=event_id)
         event.is_public = False
         await sync_to_async(event.save)()
-        await callback.answer("Событие приватное!")
+        await callback.answer(" 🔐  Событие приватное!")
         text, markup = render_event_message(event)
         await callback.message.edit_text(text, reply_markup=markup)
     except Event.DoesNotExist:
-        await callback.answer("Событие не найдено.", show_alert=True)
+        await callback.answer(" 🤷  Событие не найдено.", show_alert=True)
 
 
 @router.message(Command("list_public"))
@@ -74,7 +74,7 @@ async def list_all_public_events_handler(message: types.Message):
     events = await sync_to_async(calendar.get_public_events)(exclude_user_id=user_id)
     events = list(events)
     if not events:
-        await message.answer("Публичных событий других пользователей пока нет.")
+        await message.answer(" 🤷  Публичных событий других пользователей нет.")
     else:
         text = "Публичные события:\n\n"
         for event in events:
@@ -109,10 +109,10 @@ async def make_public_handler(message: types.Message):
 
     success = await sync_to_async(calendar.make_event_public)(event_id, user_id)
     if success:
-        await message.answer(" ✨✨✨  Событие публичное!  ✨✨✨ ")
+        await message.answer(" 🌐  Событие публичное!")
     else:
         await message.answer(
-            " ⚠️  Не удалось! (Возможно, уже публичное) ")
+            " ⚠️  Не удалось! (Возможно, уже публичное)")
 
 
 ##### Общие сообытия: "🧑‍🤝‍🧑  Общие" / "/public_events" #####
@@ -121,8 +121,9 @@ async def show_public_events_for_user(message: types.Message):
     from calendarapp.models import Appointment
     telegram_id = message.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
+    user_name = message.from_user.full_name
     if not user_id:
-        await message.answer(" 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
+        await message.answer(" 🗝️  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
         return
 
     appointments = await sync_to_async(lambda: list(
@@ -138,28 +139,31 @@ async def show_public_events_for_user(message: types.Message):
     incoming = [a for a in appointments if a.invitee_id == user_id]
     outgoing = [a for a in appointments if a.organizer_id == user_id]
 
-    def fmt(appt):
+    def fmt(appt, include_user: bool = True):
         ev = appt.event
         org = appt.organizer
         time_str = appt.time.strftime("%H:%M")
         date_str = f"{appt.date} ({time_str})"
         details = ev.details or "—"
+        user_line = f" 👤  {org.username} \n" if include_user else ""
         return (
-            f" 👤  {org.username} \n"
+            f"{user_line}"
             f" ✏️  {ev.name} \n"
-            f" 🕒  {date_str} \n"
-            f" ┈➤  {details} "
+            f" 📆  {date_str} \n"
+            f" ╰➤  {details} "
         )
 
     parts = []
     if incoming:
-        parts.append("  ⚡📨  Входящие приглашения: ")
+        parts.append(f" ⚡  Входящие приглашения:")
         for ap in incoming:
-            parts.append(fmt(ap))
+            parts.append(fmt(ap, include_user=True))
     if outgoing:
-        parts.append("  🚀📩  Исходящие приглашения: ")
+        parts.append(" 🚀  Исходящие приглашения: ")
+        # Имя организатора выводим один раз для всего блока исходящих
+        parts.append(f" 👤  {outgoing[0].organizer.username} ")
         for ap in outgoing:
-            parts.append(fmt(ap))
+            parts.append(fmt(ap, include_user=False))
 
     await message.answer("\n\n".join(parts), reply_markup=main_keyboard())
 
@@ -169,7 +173,7 @@ async def public_events_command(message: types.Message):
     await show_public_events_for_user(message)
 
 
-##### Общие сообытия #####
+##### Общие события #####
 
 
 @router.callback_query(lambda cq: cq.data.startswith("invite_event_"))
@@ -178,7 +182,7 @@ async def invite_event_start_callback(callback: types.CallbackQuery):
     users = await get_invitable_users(event_id=event_id, exclude_user_id=callback.from_user.id)
     keyboard = get_users_invite_keyboard(event_id, users)
     await callback.message.edit_text(
-        " ❓🤷  Пригласить контакт? \n Выберите пользователя: ",
+        " 🧑‍🤝‍🧑  Пригласить участников: ",
         reply_markup=keyboard
     )
 
@@ -189,7 +193,7 @@ async def button_list_calendar_events(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
+            " 🗝️  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -201,9 +205,9 @@ async def button_list_calendar_events(message: types.Message):
     lines = [
         (
             f" ✏️  {e['name']}\n"
-            f" 🕒  {datetime.strptime(str(e['date']), '%Y-%m-%d').strftime('%d-%m-%Y')}"
+            f" 📆  {datetime.strptime(str(e['date']), '%Y-%m-%d').strftime('%d-%m-%Y')}"
             f"  ({datetime.strptime(str(e['time']), '%H:%M:%S').strftime('%H:%M')})\n"
-            f" ┈➤   {e['details']}\n"
+            f" ╰➤   {e['details']}\n"
         )
         for e in events
     ]
@@ -216,7 +220,7 @@ async def calendar_list_handler(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
+            " 🗝️  Зарегистрируйтесь \n\n     🔗     '/register'",
             reply_markup=main_keyboard()
         )
         return
@@ -241,37 +245,6 @@ async def calendar_list_handler(message: types.Message):
         await message.answer(text, reply_markup=buttons)
 
 
-# @router.message(Command("calendar_show"))
-# async def calendar_show_handler(message: types.Message):
-#     args = message.text.strip().split()
-#     if len(args) != 2:
-#         await message.answer("Используй: /calendar_show <id>", reply_markup=main_keyboard())
-#         return
-#     try:
-#         event_id = int(args[1])
-#         telegram_id = message.from_user.id
-#         user_id = await calendar.get_user_db_id(telegram_id)
-#         if not user_id:
-#             await message.answer(
-#                 " 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'",
-#                 reply_markup=main_keyboard()
-#             )
-#             return
-#
-#         e = await calendar.get_event(user_id, event_id)
-#         if not e:
-#             await message.answer("Событие не найдено.", reply_markup=main_keyboard())
-#             return
-#         await message.answer(
-#             f"Событие:\nID: {e['id']}\n"
-#             f"Название: {e['name']}\n"
-#             f"Дата: {e['date']} {e['time']}\n"
-#             f"Описание: {e['details']}"
-#         )
-#     except Exception:
-#         await message.answer("Ошибка. Проверь ID.", reply_markup=main_keyboard())
-
-
 ##### Выгрузить: "🔗  Выгрузить" / '/export' #####
 @router.message(F.text == "🔗  Выгрузить")
 async def send_export_links(message: types.Message):
@@ -294,7 +267,7 @@ async def start_edit_event_callback(callback: types.CallbackQuery):
     telegram_id = callback.from_user.id
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
-        await callback.message.answer(" 🗝️🔒  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
+        await callback.message.answer(" 🗝️  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
         await callback.answer()
         return
 
@@ -310,7 +283,7 @@ async def start_edit_event_callback(callback: types.CallbackQuery):
         "id": event_id
     }
     await callback.message.answer(
-        f" Херня ➡  {event['name']}\n ↪  Введите новое название:",
+        f" ✏️  {event['name']}\n ↪  Введите новое название:",
         reply_markup=types.ReplyKeyboardRemove()
     )
     await callback.answer()
@@ -320,8 +293,8 @@ async def start_edit_event_callback(callback: types.CallbackQuery):
 @router.message(F.text == "📆  Календарь")
 async def show_calendar_month(message: types.Message):
     html_calendar, year, month = calendar.render_for_template()
-    txt = f" 📅  Календарь за {month:02}.{year}:\n\n"
-    await message.answer(txt + "\n  🔗  Открыть на сайте: \n http://127.0.0.1:8000/calendar/ ")
+    txt = f" 📅  Календарь за {month:02}.{year}:\n"
+    await message.answer(txt + "\n  🔗  Открыть на сайте: \n\n http://127.0.0.1:8000/calendar/ ")
 
 
 @router.message(Command("invite"))

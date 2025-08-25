@@ -180,7 +180,7 @@ class Calendar:
             try:
                 time = datetime.strptime(time, "%H:%M").time()
             except Exception as e:
-                logger.error(f" ❗⚠️   Ошибка парсинга времени: {e}")
+                logger.error(f" ❗⚠️  Ошибка парсинга времени: {e}")
                 return None
 
         logger.debug(
