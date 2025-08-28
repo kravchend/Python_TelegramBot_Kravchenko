@@ -68,7 +68,7 @@ async def get_invitable_users(event_id, exclude_user_id):
             telegram_id__in=already_invited
         )
 
-    return list(await sync_to_async(lambda: list(query()))())
+    return list(await sync_to_async(lambda: list(query()))()) 
 
 
 def event_public_action_keyboard(event_id, is_public):

@@ -97,7 +97,7 @@ async def update_appointment_status(request, pk):
             await sync_to_async(setattr)(appointment, 'status', 'cancelled')
             message_to_invitee = " 🙅  Вы отклонили встречу."
             message_to_organizer = (
-                f" 🙅  {await sync_to_async(lambda: appointment.invitee.username)()} отклонил приглашение "
+                f" 🙅  {await sync_to_async(lambda: appointment.invitee.username)()} отклонил приглашение: "
                 f" ✏️  '{await sync_to_async(lambda: appointment.event.name)()}'."
             )
         else:

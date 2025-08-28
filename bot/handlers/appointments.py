@@ -29,7 +29,7 @@ async def display_status(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
 
     if not user_id:
-        await message.answer(" 🗝️  Зарегистрируйтесь \n\n     🔗     '/register'", reply_markup=main_keyboard())
+        await message.answer(" 🗝️  Зарегистрируйтесь \n\n  🔗  '/register'", reply_markup=main_keyboard())
         return
 
     invitee_appointments = await sync_to_async(lambda: list(
@@ -53,7 +53,7 @@ async def display_status(message: types.Message):
             f" 👤  {organizer.username}\n"
             f" ✏️  {event.name}\n"
             f" 📅  {event.date} {event.time.strftime('%H:%M')}\n"
-            f" 👉  {status_display.get(appt.status, '❓ Неизвестно')}"
+            f"{status_display.get(appt.status, ' 🤷  Неизвестно')}"
         )
         if appt.status == "pending":
             keyboard = appointment_action_keyboard(appt.id)
@@ -62,20 +62,20 @@ async def display_status(message: types.Message):
             await message.answer(text)
 
     if organizer_appointments:
-        text = " 🗽  Вы организатор\n\n"
+        text = " 🙋  Вы организатор\n\n"
         for appt in organizer_appointments:
             event = appt.event
             invitee = appt.invitee
             text += (
                 f" ✏️  {event.name}\n"
                 f" 📅  {event.date} {event.time.strftime('%H:%M')}\n"
-                f" 🧑‍🤝‍🧑  {invitee.username}\n"
-                f" 👉  {status_display.get(appt.status, ' 🤷  Неизвестно')}\n"
+                f" 👫  {invitee.username}\n"
+                f" {status_display.get(appt.status, ' 🤷  Неизвестно')}\n\n"
             )
         await message.answer(text, reply_markup=main_keyboard())
 
     if not invitee_appointments and not organizer_appointments:
-        await message.answer(" 🔔  Нет встреч или приглашений.", reply_markup=main_keyboard())
+        await message.answer("🤷  Нет встреч или приглашений.", reply_markup=main_keyboard())
 
 
 @router.callback_query(lambda cq: cq.data.startswith("invite_"))
@@ -84,14 +84,14 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
 
     if data == "invite_done":
         await callback_query.message.answer(
-            " ✅  Приглашение завершено!",
+            "✅  Приглашение завершено!",
             reply_markup=main_keyboard(),
         )
         return
 
     parts = data.split("_")
     if len(parts) != 3:
-        await callback_query.answer(" ⛔  Некорректный формат кнопки!", show_alert=True)
+        await callback_query.answer("⛔  Некорректный формат кнопки!", show_alert=True)
         return
 
     _, event_id, invitee_tg_id = parts
@@ -153,8 +153,8 @@ async def invite_user_callback(callback_query: types.CallbackQuery):
             )
 
     except Exception as e:
-        logger.error(f"Ошибка при обработке callback: {e}")
-        await callback_query.answer(f"Ошибка: {e}", show_alert=True)
+        logger.error(f"⚠️  Ошибка при обработке callback: {e}")
+        await callback_query.answer(f"⚠️ Ошибка: {e}", show_alert=True)
 
 
 @router.callback_query(lambda cq: cq.data.startswith("appt_confirm_") or cq.data.startswith("appt_cancel_"))

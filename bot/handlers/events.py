@@ -10,7 +10,7 @@ from asgiref.sync import sync_to_async
 from datetime import datetime
 from bot.handlers.types import DummyEvent
 from .calendar_states import calendar_edit_state
-from calendarapp.models import User, Event
+from calendarapp.models import User, Event, Appointment
 from bot.handlers.users import get_bot
 
 router = Router()
@@ -35,7 +35,7 @@ async def get_user_events_with_index(user_id):
 def render_event_message(event):
     date_event = event.date.strftime('%d.%m.%Y')
     time_event = event.time.strftime('%H:%M')
-    text = f" ✏️  {event.name}\n 📆  {date_event} ({time_event})\n ╰➤  {event.details}"
+    text = f" ✏️  {event.name}\n 📆  {date_event} ({time_event})\n →  {event.details}"
     keyboard = event_public_action_keyboard(event.id, getattr(event, 'is_public', False))
     return text, keyboard
 
@@ -47,11 +47,11 @@ async def make_event_public_callback(callback: types.CallbackQuery):
         event = await sync_to_async(Event.objects.get)(id=event_id)
         event.is_public = True
         await sync_to_async(event.save)()
-        await callback.answer(" 🌐  Событие публичное.")
+        await callback.answer("🌐  Событие публичное.")
         text, markup = render_event_message(event)
         await callback.message.edit_text(text, reply_markup=markup)
     except Event.DoesNotExist:
-        await callback.answer(" 🤷  Событие не найдено.", show_alert=True)
+        await callback.answer("🤷  Событие не найдено.", show_alert=True)
 
 
 @router.callback_query(lambda c: c.data.startswith("event_private_"))
@@ -61,11 +61,11 @@ async def make_event_private_callback(callback: types.CallbackQuery):
         event = await sync_to_async(Event.objects.get)(id=event_id)
         event.is_public = False
         await sync_to_async(event.save)()
-        await callback.answer(" 🔐  Событие приватное!")
+        await callback.answer("🔐  Событие приватное!")
         text, markup = render_event_message(event)
         await callback.message.edit_text(text, reply_markup=markup)
     except Event.DoesNotExist:
-        await callback.answer(" 🤷  Событие не найдено.", show_alert=True)
+        await callback.answer("🤷  Событие не найдено.", show_alert=True)
 
 
 @router.message(Command("list_public"))
@@ -74,7 +74,7 @@ async def list_all_public_events_handler(message: types.Message):
     events = await sync_to_async(calendar.get_public_events)(exclude_user_id=user_id)
     events = list(events)
     if not events:
-        await message.answer(" 🤷  Публичных событий других пользователей нет.")
+        await message.answer("🤷  Публичных событий других пользователей нет.")
     else:
         text = "Публичные события:\n\n"
         for event in events:
@@ -92,7 +92,7 @@ async def make_public_handler(message: types.Message):
         if event_number < 1:
             raise ValueError
     except (ValueError, AttributeError):
-        await message.answer(" ⚠️  Укажите корректный номер события из списка: \n /make_public N")
+        await message.answer("⚠️  Укажите корректный номер события из списка: \n /make_public N")
         return
 
     user_id = message.from_user.id
@@ -101,7 +101,7 @@ async def make_public_handler(message: types.Message):
     user_events = list(user_events)
 
     if event_number > len(user_events):
-        await message.answer(" ❗  Событие с таким номером не найдено.")
+        await message.answer("⚠️  Событие с таким номером не найдено.")
         return
 
     event = user_events[event_number - 1]
@@ -109,10 +109,10 @@ async def make_public_handler(message: types.Message):
 
     success = await sync_to_async(calendar.make_event_public)(event_id, user_id)
     if success:
-        await message.answer(" 🌐  Событие публичное!")
+        await message.answer("🌐  Событие публичное!")
     else:
         await message.answer(
-            " ⚠️  Не удалось! (Возможно, уже публичное)")
+            "⚠️  Не удалось! (Возможно, уже публичное)")
 
 
 ##### Общие события: "🧑‍🤝‍🧑 Общие" | "/public_events" #####
@@ -138,9 +138,9 @@ async def show_public_events_for_user(message: types.Message):
     incoming = [a for a in appointments if a.invitee_id == user_id]
     outgoing = [a for a in appointments if a.organizer_id == user_id]
 
-    # # Имя пользователя Телеграм
-    # def user_line(appt) -> str:
-    #     return f" 👤  {appt.organizer.username} "
+    # Имя пользователя Телеграм
+    def user_line(appt) -> str:
+        return f" 👤  {appt.organizer.username} "
 
     def fmt_event(appt) -> str:
         ev = appt.event
@@ -150,19 +150,19 @@ async def show_public_events_for_user(message: types.Message):
         return (
             f" ✏️  {ev.name} \n"
             f" 📆  {date_str} \n"
-            f" ╰➤  {details} "
+            f" →  {details} "
         )
 
     parts = []
     if incoming:
         parts.append(" ⚡  Входящие приглашения:")
-        # for ap in incoming:
-        #     parts.append(f"{user_line(ap)}\n{fmt_event(ap)}")
+        for ap in incoming:
+            parts.append(f"{user_line(ap)}\n{fmt_event(ap)}")
 
     if outgoing:
-        parts.append(" 🚀  Исходящие приглашения: ")
-        # # Имя организатора, один раз для всего блока
-        # parts.append(user_line(outgoing[0]))
+        parts.append("  🙋 🚀   Исходящие приглашения: ")
+        # Имя организатора, один раз для всего блока
+        parts.append(user_line(outgoing[0]))
 
         # Группируем исходящие по событию и слоту (дата+время)
         grouped = {}
@@ -177,8 +177,8 @@ async def show_public_events_for_user(message: types.Message):
             ap = data["appt"]
             invitees = ", ".join(sorted(set(data["invitees"])))
             parts.append(
-                f"{fmt_event(ap)}\n"
-                f" 👫  {invitees}"
+                f" 👫  {invitees}\n"
+                f"{fmt_event(ap)}"
             )
 
     await message.answer("\n\n".join(parts), reply_markup=main_keyboard())
@@ -198,7 +198,7 @@ async def invite_event_start_callback(callback: types.CallbackQuery):
     users = await get_invitable_users(event_id=event_id, exclude_user_id=callback.from_user.id)
     keyboard = get_users_invite_keyboard(event_id, users)
     await callback.message.edit_text(
-        " 🧑‍🤝‍🧑  Пригласить участников: ",
+        "🧑‍🤝‍🧑  Пригласить участников: ",
         reply_markup=keyboard
     )
 
@@ -209,25 +209,46 @@ async def button_list_calendar_events(message: types.Message):
     user_id = await calendar.get_user_db_id(telegram_id)
     if not user_id:
         await message.answer(
-            " 🗝️  Зарегистрируйтесь \n\n     🔗     '/register'",
+            " 🗝️  Зарегистрируйтесь \n\n  🔗  '/register'",
             reply_markup=main_keyboard()
         )
         return
 
     events = await get_user_events_with_index(user_id)
     if not events:
-        await message.answer(" 🤷  Событий пока нет.", reply_markup=main_keyboard())
+        await message.answer("🤷  Событий пока нет.", reply_markup=main_keyboard())
         return
-    lines = [
-        (
+
+    # Собираем приглашённых по событиям текущего пользователя
+    event_ids = [e.get("id") for e in events if e.get("id")]
+    invites_by_event = {}
+    if event_ids:
+        appts = await sync_to_async(lambda: list(
+            Appointment.objects
+            .filter(organizer_id=user_id, event_id__in=event_ids)
+            .select_related("invitee")
+        ))()
+        for ap in appts:
+            invites_by_event.setdefault(ap.event_id, set()).add(ap.invitee.username or f"id:{ap.invitee_id}")
+
+    lines = []
+    for e in events:
+        date_str = datetime.strptime(str(e['date']), '%Y-%m-%d').strftime('%d-%m-%Y')
+        time_str = datetime.strptime(str(e['time']), '%H:%M:%S').strftime('%H:%M')
+        invited_line = ""
+        eid = e.get("id")
+        if eid and invites_by_event.get(eid):
+            invited = ", ".join(sorted(invites_by_event[eid]))
+            invited_line = f" 👫  {invited}\n"
+        lines.append(
             f" ✏️  {e['name']}\n"
-            f" 📆  {datetime.strptime(str(e['date']), '%Y-%m-%d').strftime('%d-%m-%Y')}"
-            f"  ({datetime.strptime(str(e['time']), '%H:%M:%S').strftime('%H:%M')})\n"
-            f" ╰➤   {e['details']}\n"
+            f" 📆  {date_str}  ({time_str})\n"
+            f"{invited_line}" 
+            f" →   {e['details']}\n"
         )
-        for e in events
-    ]
+
     await message.answer(" 👤📜 \n\n" + " \n ".join(lines) + " \n ", reply_markup=main_keyboard())
+
 
 
 @router.message(Command("calendar_list"))
@@ -244,7 +265,7 @@ async def calendar_list_handler(message: types.Message):
     events = await get_user_events_with_index(user_id)
 
     if not events:
-        await message.answer(" 🤷  Событий пока нет.", reply_markup=main_keyboard())
+        await message.answer("🤷  Событий пока нет.", reply_markup=main_keyboard())
         return
     for e in events:
         ev = DummyEvent(
@@ -309,7 +330,7 @@ async def start_edit_event_callback(callback: types.CallbackQuery):
 @router.message(F.text == "📆  Календарь")
 async def show_calendar_month(message: types.Message):
     html_calendar, year, month = calendar.render_for_template()
-    txt = f" 📅  Календарь за {month:02}.{year}:\n"
+    txt = f"📅  Календарь за {month:02}.{year}:\n"
     await message.answer(txt + "\n  🔗  Открыть на сайте: \n\n http://127.0.0.1:8000/calendar/ ")
 
 
@@ -333,7 +354,7 @@ async def command_invite_user(message: types.Message):
 
     if not (organizer and invitee and event):
         await message.answer(
-            " ⚠️  Проверьте корректность.",
+            "⚠️  Проверьте корректность.",
             reply_markup=main_keyboard()
         )
         return

@@ -79,7 +79,7 @@ async def process_calendar_creation(message: types.Message, **kwargs):
             try:
                 time_obj = datetime.strptime(message.text.strip(), "%H:%M")
             except ValueError:
-                await message.answer(" ❌  Неверный формат времени. Используйте ЧЧ:ММ")
+                await message.answer(" ⚠️ Неверный формат времени. Используйте ЧЧ:ММ")
                 return
 
             state["time"] = time_obj.strftime("%H:%M:%S")
@@ -88,7 +88,7 @@ async def process_calendar_creation(message: types.Message, **kwargs):
             )
 
             if not event_id:
-                await message.answer(" ❌  Ошибка при создании события.", reply_markup=main_keyboard())
+                await message.answer(" ⚠️ Ошибка при создании события.", reply_markup=main_keyboard())
                 calendar_creation_state.pop(telegram_id, None)
                 return
 
@@ -112,7 +112,7 @@ async def process_calendar_creation(message: types.Message, **kwargs):
             calendar_creation_state.pop(telegram_id, None)
 
     except Exception as e:
-        await message.answer(f" ❌  Ошибка: {e}", reply_markup=main_keyboard())
+        await message.answer(f" ⚠️  Ошибка: {e}", reply_markup=main_keyboard())
         calendar_creation_state.pop(telegram_id, None)
 
 
@@ -144,14 +144,14 @@ async def process_calendar_editing_by_number(message: types.Message, **kwargs):
                 "id": event["id"],
                 "step": "name"
             })
-            await message.answer(f" ✏️  Название: \n  👉  {event['name']} \n 👇  Новое название:")
+            await message.answer(f"  ✏️  {event['name']} \n Введите новое название:")
         except Exception:
-            await message.answer(" ❌  \n Некорректный номер. Попробуйте снова.")
+            await message.answer("  ❌  \n Некорректный номер. Попробуйте снова.")
             calendar_edit_state.pop(telegram_id, None)
     elif step == "name":
         state["name"] = message.text.strip()
         state["step"] = "date"
-        await message.answer(" 🗓️ \n 👇  Новая дата (ГГГГ-ММ-ДД): ")
+        await message.answer("  🗓️  Новая дата (ГГГГ-ММ-ДД): ")
     elif step == "date":
         state["date"] = message.text.strip()
         state["step"] = "time"
@@ -159,7 +159,7 @@ async def process_calendar_editing_by_number(message: types.Message, **kwargs):
     elif step == "time":
         state["time"] = message.text.strip()
         state["step"] = "details"
-        await message.answer(" 📝  Новое описание: \n 👇")
+        await message.answer(" 📝  Новое описание:")
     elif step == "details":
         state["details"] = message.text.strip()
         try:
@@ -202,14 +202,14 @@ async def button_edit_calendar_event(message: types.Message, **kwargs):
         await message.answer(" 🤷 Нет событий для изменения.", reply_markup=main_keyboard())
         return
 
-    lines = [f"{e['order']}. {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events]
+    lines = [f"  👉  {e['order']}. {e['name']} | {e['date']} {e['time']} — {e['details']}" for e in events]
     calendar_edit_state[telegram_id] = {
         "events": events,
         "step": "num"
     }
 
     await message.answer(
-        " 👇  Номер события для редактирования:\n" + "\n".join(lines),
+        "  🛠️  Введите номер события для редактирования:\n" + "\n".join(lines),
         reply_markup=types.ReplyKeyboardRemove()
     )
 
