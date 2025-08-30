@@ -215,7 +215,7 @@ async def appointment_action_callback(callback: types.CallbackQuery):
     except ValueError as e:
         await callback.answer("⚠️  Некорректные данные.", show_alert=True)
     except TelegramBadRequest as e:
-        logger.error(f"Ошибка отправки сообщения: {e}")
+        logger.error(f"⚠️  Ошибка отправки сообщения: {e}")
         await callback.answer("⚠️  Ошибка отправки сообщения.\n\nВозможно, пользователь заблокировал бота.",
                               show_alert=True)
     except Exception as e:

@@ -50,7 +50,7 @@ def get_users_invite_keyboard(event_id, users):
                     )
                 )
         inline_keyboard.append(row)
-    inline_keyboard.append([InlineKeyboardButton(text="Готово", callback_data="invite_done")])
+    inline_keyboard.append([InlineKeyboardButton(text="🏁  Готово", callback_data="invite_done")])
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
