@@ -18,8 +18,8 @@ async def get_bot():
     return bot
 
 
-@router.message(Command("start"))
-@router.message(Command("register"))
+# @router.message(Command("start"))
+@router.message(Command("start", "register"))
 async def send_welcome(message: types.Message):
     telegram_id = message.from_user.id
     username = message.from_user.username or f"User_{telegram_id}"
@@ -38,32 +38,35 @@ async def send_welcome(message: types.Message):
         if created:
             user.set_password(password)
             await sync_to_async(user.save)()
+            # Анимация
             await message.answer(
-                f"     ✨    ✨    ✨    ✨    ✨    ✨    ✨    ✨     \n\n"
+                f"💫"
+            )
 
-                f" 🤝  {username}, \n вы успешно зарегистрированы!\n\n"
+            await message.answer(
+                f"🤝  {username}, вы успешно\n зарегистрированы!\n\n"
 
-                f" 🚀  Ваши данные для входа на сайт:\n\n"
+                f"🗝️🛡️  Ваши данные для входа на сайт:\n\n"
 
                 f"  👤  Username: `{username}`\n"
                 f"  🔐  Password: `{password}`\n\n"
 
                 f"  🔗  http://127.0.0.1:8000/login/\n\n"
 
-                f"💻 💫  Используйте для доступа \n к записям на других устройствах!",
+                f"💻  Используйте для доступа \nк записям на других устройствах!",
 
                 reply_markup=main_keyboard(),
                 parse_mode="Markdown"
             )
         else:
             await message.answer(
-                f"  ✨👤   {username}, \n добро пожаловать!",
+                f"👤  {username}, \nдобро пожаловать!",
                 reply_markup=main_keyboard()
             )
 
     except Exception as e:
-        logger.error(f" ⚠️  Ошибка регистрации пользователя (Telegram ID {telegram_id}): {e}")
-        await message.answer(" ⚠️ 🤷  Произошла ошибка. Попробуйте позже.")
+        logger.error(f"⚠️  Ошибка регистрации пользователя (Telegram ID {telegram_id}): {e}")
+        await message.answer("⚠️  Произошла ошибка. Попробуйте позже.")
 
 
 async def get_user_id(message):

@@ -10,12 +10,11 @@ def main_keyboard():
             types.KeyboardButton(text="✏️  Создать"),
             types.KeyboardButton(text="📜  События"),
             types.KeyboardButton(text="📆  Календарь"),
-            # types.KeyboardButton(text="🎢  Статус приглашений"),
         ],
         [
 
             types.KeyboardButton(text="🧑‍🤝‍🧑  Общие"),
-            types.KeyboardButton(text="🔑  Изменить"),
+            types.KeyboardButton(text="🛠️  Изменить"),
             types.KeyboardButton(text="🗑️  Удалить"),
         ],
         [
@@ -30,7 +29,7 @@ def get_invite_keyboard(event_id):
     return InlineKeyboardMarkup(
         inline_keyboard=[[
             InlineKeyboardButton(text="➕  Пригласить", callback_data=f"invite_event_{event_id}"),
-            InlineKeyboardButton(text="🏁  Готово", callback_data=f"invite_event_{event_id}")
+            InlineKeyboardButton(text="🏁  Готово", callback_data=f"invite_event_{event_id}"),
         ]]
     )
 
@@ -68,19 +67,23 @@ async def get_invitable_users(event_id, exclude_user_id):
             telegram_id__in=already_invited
         )
 
-    return list(await sync_to_async(lambda: list(query()))()) 
+    return list(await sync_to_async(lambda: list(query()))())
 
 
 def event_public_action_keyboard(event_id, is_public):
     if is_public:
         return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔒 Сделать приватным", callback_data=f"event_private_{event_id}")],
-            [InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")]
+            [
+                InlineKeyboardButton(text="🔒  Сделать приватным", callback_data=f"event_private_{event_id}"),
+                InlineKeyboardButton(text="➕  Пригласить", callback_data=f"invite_event_{event_id}")
+            ],
         ])
     else:
         return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🌐 Сделать публичным", callback_data=f"event_public_{event_id}")],
-            [InlineKeyboardButton(text="➕ Пригласить", callback_data=f"invite_event_{event_id}")]
+            [
+                InlineKeyboardButton(text="🌐  Сделать публичным", callback_data=f"event_public_{event_id}"),
+                InlineKeyboardButton(text="➕  Пригласить", callback_data=f"invite_event_{event_id}")
+            ],
         ])
 
 

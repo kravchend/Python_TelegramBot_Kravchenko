@@ -27,7 +27,7 @@ def home(request):
 
 def custom_logout(request):
     logout(request)
-    messages.info(request, " 🗝️🔒  Вы успешно вышли из системы. Пожалуйста, войдите или зарегистрируйтесь.")
+    messages.info(request, "🔐  Вы успешно вышли из системы. Пожалуйста, войдите или зарегистрируйтесь.")
     return redirect('home')
 
 
@@ -51,13 +51,13 @@ def site_register_view(request):
 
             if user:
                 if user.has_usable_password():
-                    messages.error(request, " 🙋  Этот пользователь уже зарегистрирован! \n 🗝️  Войдите в систему.")
+                    messages.error(request, "🙋  Пользователь уже зарегистрирован! \n🗝️  Войдите в систему.")
                     return render(request, "registration/register.html", {"form": form})
 
                 user.set_password(password)
                 user.save()
                 login(request, user)
-                messages.success(request, " ✅  Вы успешно завершили регистрацию!")
+                messages.success(request, "✅  Вы успешно завершили регистрацию!")
                 return redirect("home")
             else:
                 logger.debug("Создаем нового пользователя...")
@@ -66,12 +66,12 @@ def site_register_view(request):
                 user.telegram_id = telegram_id
                 user.save()
                 login(request, user)
-                messages.success(request, " ✅  Регистрация прошла успешно!")
+                messages.success(request, "✅  Регистрация прошла успешно!")
                 return redirect("home")
 
         else:
-            logger.warning(f" ⚠️  Ошибки в форме регистрации: {form.errors}")
-            messages.error(request, " ⚠️  Ошибка при регистрации. Проверьте указанные данные.")
+            logger.warning(f"⚠️  Ошибки в форме регистрации: {form.errors}")
+            messages.error(request, "⚠️  Ошибка при регистрации. Проверьте указанные данные.")
     else:
         initial_data = {"username": username or "", "telegram_id": telegram_id or ""}
         form = SiteRegistrationForm(initial=initial_data)
@@ -88,20 +88,20 @@ async def update_appointment_status(request, pk):
 
         if action == 'confirm':
             await sync_to_async(setattr)(appointment, 'status', 'confirmed')
-            message_to_invitee = " 🙋  Вы подтвердили встречу."
+            message_to_invitee = "🙋  Вы подтвердили встречу."
             message_to_organizer = (
-                f" 💫✨ \n\n 👤  {await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие \n"
-                f" ✏️  '{await sync_to_async(lambda: appointment.event.name)()}'."
+                f"📣\n\n 🙋  {await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие \n"
+                f"📌  '{await sync_to_async(lambda: appointment.event.name)()}'."
             )
         elif action == 'cancel':
             await sync_to_async(setattr)(appointment, 'status', 'cancelled')
-            message_to_invitee = " 🙅  Вы отклонили встречу."
+            message_to_invitee = "🙅  Вы отклонили встречу."
             message_to_organizer = (
-                f" 🙅  {await sync_to_async(lambda: appointment.invitee.username)()} отклонил приглашение: "
-                f" ✏️  '{await sync_to_async(lambda: appointment.event.name)()}'."
+                f"🙅  {await sync_to_async(lambda: appointment.invitee.username)()} отклонил приглашение: "
+                f"📌  '{await sync_to_async(lambda: appointment.event.name)()}'."
             )
         else:
-            return HttpResponseForbidden(" ⚠️  Некорректное действие.")
+            return HttpResponseForbidden("⚠️  Некорректное действие.")
 
         await sync_to_async(appointment.save)()
 
@@ -111,7 +111,7 @@ async def update_appointment_status(request, pk):
                 bot = await get_bot()
                 await bot.send_message(chat_id=organizer_telegram_id, text=message_to_organizer)
             except Exception as e:
-                print(f" ⚠️  Ошибка отправки уведомления организатору: {e}")
+                print(f"⚠️  Ошибка отправки уведомления организатору: {e}")
 
         invitee_telegram_id = await sync_to_async(lambda: appointment.invitee.telegram_id)()
         if invitee_telegram_id:
@@ -119,14 +119,14 @@ async def update_appointment_status(request, pk):
                 bot = await get_bot()
                 await bot.send_message(chat_id=invitee_telegram_id, text=message_to_invitee)
             except Exception as e:
-                print(f" ⚠️  Ошибка отправки уведомления участнику: {e}")
+                print(f"⚠️  Ошибка отправки уведомления участнику: {e}")
 
         messages.success(request, message_to_invitee)
         return redirect('user_appointments')
 
     except Exception as e:
-        print(f" ⚠️  Ошибка в обработке запроса: {e}")
-        return HttpResponseServerError(" ⚠️  Произошла ошибка при обработке вашего запроса.")
+        print(f"⚠️  Ошибка в обработке запроса: {e}")
+        return HttpResponseServerError("⚠️  Произошла ошибка при обработке вашего запроса.")
 
 
 @login_required
@@ -152,7 +152,7 @@ def event_create(request):
             )
             return redirect('invite_users', pk=new_event.pk)
         else:
-            print("Ошибки формы (event_create):", form.errors)
+            print("⚠️  Ошибки формы (event_create):", form.errors)
             print("Данные POST (event_create):", request.POST)
     else:
         form = EventForm()
@@ -163,7 +163,7 @@ def event_create(request):
 def event_edit(request, pk):
     event = get_object_or_404(Event, pk=pk)
     if event.user != request.user:
-        return HttpResponseForbidden("Нельзя редактировать чужое событие!")
+        return HttpResponseForbidden("⚠️  Вы не можете редактировать чужое событие!")
     if request.method == 'POST':
         form = EventForm(request.POST, instance=event)
         if form.is_valid():
@@ -178,7 +178,7 @@ def event_edit(request, pk):
 def event_delete(request, pk):
     event = get_object_or_404(Event, pk=pk)
     if event.user != request.user:
-        return HttpResponseForbidden("Нельзя удалить чужое событие!")
+        return HttpResponseForbidden("⚠️  Вы не можете редактировать чужое событие!")
     if request.method == 'POST':
         event.delete()
         return redirect('calendar')
@@ -369,29 +369,29 @@ async def invite_users_to_event(request, pk):
                         await bot.send_message(
                             chat_id=user.telegram_id,
                             text=(
-                                f" 😎 📩  \n Новое приглашение! \n\n"
-                                f" 📌  {event.name}\n"
-                                f" 🕒  {event.date} ({event.time:%H:%M})\n"
-                                f" 💎  {event.details or 'Не указаны'}\n\n"
+                                f"🛎️\n\n📨  Новое приглашение! \n\n"
+                                f"📌  {event.name}\n"
+                                f"📆  {event.date} ({event.time:%H:%M})\n"
+                                f"✏️  {event.details or 'Не указаны'}\n\n"
                             ),
                             reply_markup=appointment_action_keyboard(appointment.id)
                         )
 
                         delivered_invites.append(user.username)
                     except TelegramBadRequest as e:
-                        logger.error(f" ❌  Ошибка доставки сообщения {user.username}: {e}")
+                        logger.error(f"⚠️  Ошибка доставки сообщения {user.username}: {e}")
                         failed_invites.append(user.username)
                 else:
                     failed_invites.append(user.username)
 
             except Exception as e:
-                logger.error(f" ❌   Не удалось обработать пользователя {user.username}: {e}")
+                logger.error(f"⚠️  Не удалось обработать пользователя {user.username}: {e}")
                 failed_invites.append(user.username)
 
         if failed_invites:
             messages.warning(
                 request,
-                f" ⚠️🚀  Часть приглашений отправлена,\nно возникли проблемы с пользователями:\n{', '.join(failed_invites)}"
+                f"⚠️🚀\n\nЧасть приглашений отправлена,\nно возникли проблемы с пользователями:\n{', '.join(failed_invites)}"
             )
         else:
             messages.success(request, " 🚀💫   Все приглашения отправлены!")
