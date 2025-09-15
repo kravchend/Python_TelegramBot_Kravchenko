@@ -90,8 +90,8 @@ async def update_appointment_status(request, pk):
             await sync_to_async(setattr)(appointment, 'status', 'confirmed')
             message_to_invitee = "🙋  Вы подтвердили встречу."
             message_to_organizer = (
-                f"📣\n\n 🙋  {await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие \n"
-                f"📌  '{await sync_to_async(lambda: appointment.event.name)()}'."
+                f"📣\n\n 🙋  {await sync_to_async(lambda: appointment.invitee.username)()} подтвердил участие в событии:\n"
+                f"📌  {await sync_to_async(lambda: appointment.event.name)()}"
             )
         elif action == 'cancel':
             await sync_to_async(setattr)(appointment, 'status', 'cancelled')
@@ -313,10 +313,11 @@ def export_events_csv(request):
 
 @login_required
 def event_detail(request, pk):
-    event = get_object_or_404(
-        Event,
-        Q(id=pk) & (Q(user=request.user) | Q(appointment__invitee=request.user)),  # Условия доступа
-    )
+    event_qs = Event.objects.filter(
+        Q(id=pk) & (Q(user=request.user) | Q(appointment__invitee=request.user))  # Условия доступа
+    ).distinct()
+
+    event = get_object_or_404(event_qs)
 
     invitable_users = User.objects.exclude(id=request.user.id).exclude(
         id__in=Appointment.objects.filter(event=event).values_list('invitee_id', flat=True)
@@ -394,7 +395,7 @@ async def invite_users_to_event(request, pk):
                 f"⚠️🚀\n\nЧасть приглашений отправлена,\nно возникли проблемы с пользователями:\n{', '.join(failed_invites)}"
             )
         else:
-            messages.success(request, " 🚀💫   Все приглашения отправлены!")
+            messages.success(request, "🚀💫   Все приглашения отправлены!")
 
         return redirect('user_appointments')
 

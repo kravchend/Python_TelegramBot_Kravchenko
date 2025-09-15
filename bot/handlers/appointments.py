@@ -169,12 +169,12 @@ async def appointment_action_callback(callback: types.CallbackQuery):
             appointment_id = int(data.replace("appt_confirm_", ""))
             action = "confirmed"
             participant_action_text = "🙋  Вы подтвердили участие!"
-            organizer_action_text = "подтвердил"
+            organizer_action_text = "подтвердил приглашение:"
         elif data.startswith("appt_cancel_"):
             appointment_id = int(data.replace("appt_cancel_", ""))
             action = "cancelled"
             participant_action_text = "🙅  Вы отклонили приглашение"
-            organizer_action_text = "отклонил"
+            organizer_action_text = "отклонил приглашение:"
         else:
             raise ValueError("⚠️  Некорректный формат данных.")
 
@@ -197,8 +197,8 @@ async def appointment_action_callback(callback: types.CallbackQuery):
 
         if organizer_telegram_id:
             organizer_message = (
-                f"👤  {invitee_username} \n {organizer_action_text} \n"
-                f"📨  приглашение на событие \"{event_name}\"."
+                f"👤  {invitee_username} {organizer_action_text}"
+                f"📌  {event_name}"
             )
             try:
                 await bot.send_message(organizer_telegram_id, organizer_message)
@@ -221,16 +221,3 @@ async def appointment_action_callback(callback: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка обработки callback: {e}")
         await callback.answer("⚠️ \nПроизошла ошибка.\nПопробуйте позже.", show_alert=True)
-
-
-@sync_to_async
-def update_appointment_status(app_id, new_status):
-    appointment = Appointment.objects.get(pk=app_id)
-    appointment.status = new_status
-    appointment.save()
-    return appointment
-
-
-@sync_to_async
-def get_appointment_by_id(app_id):
-    return Appointment.objects.get(pk=app_id)
