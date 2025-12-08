@@ -22,14 +22,25 @@ def main_keyboard():
             types.KeyboardButton(text="🔗  Выгрузить"),
         ],
     ]
-    return types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True, is_persistent=True)
+    return types.ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True,
+                                     is_persistent=True)
+
+
+def cancel_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_action")
+        ]]
+    )
 
 
 def get_invite_keyboard(event_id):
     return InlineKeyboardMarkup(
         inline_keyboard=[[
-            InlineKeyboardButton(text="➕  Пригласить", callback_data=f"invite_event_{event_id}"),
-            InlineKeyboardButton(text="🏁  Готово", callback_data=f"invite_event_{event_id}"),
+            InlineKeyboardButton(text="➕  Пригласить",
+                                 callback_data=f"invite_event_{event_id}"),
+            InlineKeyboardButton(text="🏁  Готово",
+                                 callback_data=f"invite_event_{event_id}"),
         ]]
     )
 
@@ -49,7 +60,8 @@ def get_users_invite_keyboard(event_id, users):
                     )
                 )
         inline_keyboard.append(row)
-    inline_keyboard.append([InlineKeyboardButton(text="🏁  Готово", callback_data="invite_done")])
+    inline_keyboard.append(
+        [InlineKeyboardButton(text="🏁  Готово", callback_data="invite_done")])
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
@@ -74,21 +86,27 @@ def event_public_action_keyboard(event_id, is_public):
     if is_public:
         return InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="🔒  Сделать приватным", callback_data=f"event_private_{event_id}"),
-                InlineKeyboardButton(text="➕  Пригласить", callback_data=f"invite_event_{event_id}")
+                InlineKeyboardButton(text="🔒  Сделать приватным",
+                                     callback_data=f"event_private_{event_id}"),
+                InlineKeyboardButton(text="➕  Пригласить",
+                                     callback_data=f"invite_event_{event_id}")
             ],
         ])
     else:
         return InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="🌐  Сделать публичным", callback_data=f"event_public_{event_id}"),
-                InlineKeyboardButton(text="➕  Пригласить", callback_data=f"invite_event_{event_id}")
+                InlineKeyboardButton(text="🌐  Сделать публичным",
+                                     callback_data=f"event_public_{event_id}"),
+                InlineKeyboardButton(text="➕  Пригласить",
+                                     callback_data=f"invite_event_{event_id}")
             ],
         ])
 
 
 def appointment_action_keyboard(appointment_id):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"appt_confirm_{appointment_id}")],
-        [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"appt_cancel_{appointment_id}")]
+        [InlineKeyboardButton(text="✅ Подтвердить",
+                              callback_data=f"appt_confirm_{appointment_id}")],
+        [InlineKeyboardButton(text="❌ Отклонить",
+                              callback_data=f"appt_cancel_{appointment_id}")]
     ])

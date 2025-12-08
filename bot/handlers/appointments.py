@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
-
 ##### СТАТУС ПРИГЛАШЕНИЙ #####
 @router.message(lambda message: message.text == "🎢  Статус приглашений")
 async def status_button_handler(message: types.Message):

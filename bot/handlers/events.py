@@ -320,7 +320,7 @@ async def start_edit_event_callback(callback: types.CallbackQuery):
         "id": event_id
     }
     await callback.message.answer(
-        f" ❌ ⚠️ ❗✏️  {event['name']}\n ↪  Введите новое название:",
+        f" ✏️  {event['name']}\n ↪  Введите новое название:",
         reply_markup=types.ReplyKeyboardRemove()
     )
     await callback.answer()
